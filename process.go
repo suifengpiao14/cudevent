@@ -1,7 +1,7 @@
 package autofillcopyfield
 
 import (
-	"fmt"
+	"reflect"
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -22,14 +22,6 @@ const (
 // 默认容器
 var defaultContainer = NewContainer(TOPIC, pubSub, pubSub)
 
-func RegisterProcessor(processors ...Processor) {
-	defaultContainer.RegisterProcessor(processors...)
-}
-
-func GetProcessor(name string) (processor Processor, ok bool) {
-	return defaultContainer.GetProcessor(name)
-}
-
 func GetContainer() *_Container {
 	return defaultContainer
 }
@@ -38,8 +30,6 @@ func SetContainer(c *_Container) {
 }
 
 type _Container struct {
-	processors Processors
-	topic      string
 	publisher  message.Publisher
 	subscriber message.Subscriber
 }
@@ -47,78 +37,28 @@ type _Container struct {
 func NewContainer(topic string, publisher message.Publisher, subscriber message.Subscriber) (container *_Container) {
 
 	container = &_Container{
-		topic:      topic,
 		publisher:  publisher,
 		subscriber: subscriber,
 	}
 	return
 }
 
-type Processors []Processor
-
-func (pros *Processors) Add(processors ...Processor) {
-	for _, nh := range processors {
-		exists := false
-		for _, h := range *pros {
-			if h.GetName() == nh.GetName() {
-				exists = true
-				break
-			}
-		}
-		if !exists {
-			*pros = append(*pros, nh)
-		}
-	}
-}
-
-func (pros Processors) GetProcessor(name string) (processor Processor, ok bool) {
-	for _, h := range pros {
-		if h.GetName() == name {
-			return h, true
-		}
-	}
-	return nil, false
-}
-
-type Processor interface {
-	Exec(processMessage ProcessMessage, dst interface{}) (err error)
-	GetName() string
-}
-
 const (
-	PROCESS_SQL       = "sql"
-	PROCESS_SQL_EXEC  = "sql_exec"
-	PROCESS_HTTP      = "http"
-	PROCESS_HTTP_EXEC = "http_exec"
-)
-
-type EventType string
-
-const (
-	EVENT_TYPE_CREATING EventType = "creating"
-	EVENT_TYPE_CREATED  EventType = "created"
-	EVENT_TYPE_UPDATING EventType = "updating"
-	EVENT_TYPE_UPDATED  EventType = "updated"
-	EVENT_TYPE_DELETING EventType = "deleting"
-	EVENT_TYPE_DELETED  EventType = "deleted"
+	EVENT_TYPE_CREATING = "creating"
+	EVENT_TYPE_CREATED  = "created"
+	EVENT_TYPE_UPDATING = "updating"
+	EVENT_TYPE_UPDATED  = "updated"
+	EVENT_TYPE_DELETING = "deleting"
+	EVENT_TYPE_DELETED  = "deleted"
 )
 
 type Event struct {
-	ModelName string    `json:"name"`
-	Type      EventType `json:"type"`
-	SourceID  Fields    `json:"primary"`
-	OldAttr   Fields    `json:"old"`
-	NewAttr   Fields    `json:"new"`
-}
-
-func (e Event) GetIdentify() (identify string) {
-	identify = fmt.Sprintf("%s_%s", e.ModelName, e.Type)
-	return identify
-}
-
-type EventWithSub struct {
-	Type   EventType      `json:"type"`
-	Source ProcessMessage `json:"source"`
+	Topic    string `json:"topic"`
+	EventID  string `json:"eventId"`
+	Type     string `json:"type"`
+	SourceID Fields `json:"primary"`
+	OldAttr  Fields `json:"old"`
+	NewAttr  Fields `json:"new"`
 }
 
 type RunContext struct {
@@ -144,49 +84,43 @@ type Field struct {
 	Type  string `json:"type"`
 }
 
+func (f Field) GetValue(dst interface{}) {
+	var value interface{}
+	switch f.Type {
+	case "int":
+		value = cast.ToInt(f.Value)
+	case "float":
+		value = cast.ToFloat64(f.Value)
+	case "bool":
+		value = cast.ToBool(f.Value)
+	default:
+		value = f.Value
+	}
+	rv := reflect.Indirect(reflect.ValueOf(dst))
+	if !rv.CanSet() {
+		err := errors.Errorf("dst want ptr , got:%T", dst)
+		panic(err)
+	}
+	rv.Set(reflect.Indirect(reflect.ValueOf(value)))
+}
+
 type Fields []Field
 
+func (fields Fields) GetValue(name string, value interface{}) (ok bool) {
+	for _, field := range fields {
+		if field.Name == name {
+			field.GetValue(value)
+			return true
+		}
+	}
+	return false
+}
 func (fields Fields) Map() (m map[string]interface{}) {
 	m = make(map[string]interface{})
 	for _, field := range fields {
 		var value interface{}
-		switch field.Type {
-		case "int":
-			value = cast.ToInt(field.Value)
-		case "float":
-			value = cast.ToFloat64(field.Value)
-		case "bool":
-			value = cast.ToBool(field.Value)
-		default:
-			value = field.Value
-		}
+		field.GetValue(&value)
 		m[field.Name] = value
 	}
 	return m
-}
-
-// 注册处理器
-func (c *_Container) RegisterProcessor(processors ...Processor) {
-	if c.processors == nil {
-		c.processors = make(Processors, 0)
-	}
-	c.processors.Add(processors...)
-}
-func (c *_Container) GetProcessor(name string) (processor Processor, ok bool) {
-	return c.processors.GetProcessor(name)
-}
-
-// 处理事件
-func (c _Container) Work(event EventWithSub) (err error) {
-	processor, ok := c.processors.GetProcessor(event.Source.ProcessName)
-	if ok {
-		err = errors.WithMessagef(err, "processor name:%s", event.Source.ProcessName)
-		return err
-	}
-	var dst interface{}
-	err = processor.Exec(event.Source, dst)
-	if err != nil {
-		return err
-	}
-	return nil
 }

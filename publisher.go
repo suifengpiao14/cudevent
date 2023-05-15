@@ -7,7 +7,7 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
-//Publish 发布消息
+// Publish 发布消息
 func Publish(event Event) (response <-chan []byte, err error) {
 	b, err := json.Marshal(event)
 	if err != nil {
@@ -18,6 +18,6 @@ func Publish(event Event) (response <-chan []byte, err error) {
 		Payload: b,
 	}
 	container := GetContainer()
-	err = container.publisher.Publish(container.topic, &msg)
+	err = container.publisher.Publish(event.Topic, &msg)
 	return nil, err
 }

@@ -4,13 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/pkg/errors"
-
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/suifengpiao14/logchan/v2"
 )
-
-var ERR_HANDLER_NOT_FOUND = errors.New("handler not found")
 
 type LogName string
 
@@ -22,7 +18,7 @@ const LOG_INFO_SUBSCRIBER LogName = "LOG_INFO_SUBSCRIBER"
 
 type SubscriberLogInfo struct {
 	Msg   message.Message
-	Event EventWithSub
+	Event Event
 	err   error
 }
 
@@ -34,24 +30,27 @@ func (l SubscriberLogInfo) Error() error {
 	return l.err
 }
 
-func Subscriber() (err error) {
-	container := GetContainer()
-	messages, err := container.subscriber.Subscribe(context.Background(), container.topic)
+type SubscriberFn func(event *Event) (err error)
+
+func Subscriber(topc string, fn SubscriberFn) (err error) {
+	messageChan, err := defaultContainer.subscriber.Subscribe(context.Background(), topc)
 	if err != nil {
 		return err
 	}
-	for msg := range messages {
-		msg.Ack()
-		process(msg)
+	go func() {
+		for msg := range messageChan {
+			msg.Ack()
+			process(msg, fn)
 
-	}
+		}
+	}()
 	return nil
 
 }
 
-func process(msg *message.Message) {
+func process(msg *message.Message, handlerFn SubscriberFn) {
 	var err error
-	event := EventWithSub{}
+	event := Event{}
 	defer func() {
 		logInfo := SubscriberLogInfo{
 			Msg:   *msg,
@@ -64,6 +63,5 @@ func process(msg *message.Message) {
 	if err != nil {
 		return
 	}
-	container := GetContainer()
-	err = container.Work(event)
+	err = handlerFn(&event)
 }
