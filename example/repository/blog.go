@@ -13,6 +13,7 @@ func init() {
 
 const (
 	EVENT_MODEL_NAME_BLOG_CREATED = "blog_created"
+	EVENT_MODEL_NAME_BLOG_CREATING = "blog_creating"
 )
 
 type Blog struct {
@@ -72,3 +73,27 @@ func (b Blog) emitBlogCreated() (err error) {
 	}
 	return nil
 }
+func (b Blog)handlerBlogCreating(){
+	
+}
+
+func (b Blog) emitBlogCreating() (err error) {
+	event := autofillcopyfield.Event{
+		Topic:   EVENT_MODEL_NAME_BLOG_CREATING,
+		EventID: EVENT_MODEL_NAME_BLOG_CREATING,
+		Type:    autofillcopyfield.EVENT_TYPE_CREATING,
+		SourceID: autofillcopyfield.Fields{
+			{Name: "id", Value: "1", Type: "int"},
+		},
+		NewAttr: autofillcopyfield.Fields{
+			{Name: "userId", Value: cast.ToString(b.UserID), Type: "int"},
+		},
+	}
+	_, err = autofillcopyfield.Publish(event)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+
