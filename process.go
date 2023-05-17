@@ -1,6 +1,7 @@
-package autofillcopyfield
+package syncdata
 
 import (
+	"encoding/json"
 	"reflect"
 
 	"github.com/ThreeDotsLabs/watermill"
@@ -16,7 +17,7 @@ var pubSub = gochannel.NewGoChannel(
 )
 
 const (
-	TOPIC = "autofillcopyfield"
+	TOPIC = "syncdata"
 )
 
 // 默认容器
@@ -43,13 +44,39 @@ func NewContainer(topic string, publisher message.Publisher, subscriber message.
 	return
 }
 
+// 变化前后的负载
+type ChangedPayload struct {
+	EventType *string     `json:"eventType"`
+	ID        interface{} `json:"id"`
+	Before    interface{} `json:"befor"`
+	After     interface{} `json:"after"`
+}
+
+func (changedPayload ChangedPayload) ToMessage() (msg *message.Message) {
+	b, _ := json.Marshal(changedPayload)
+	msg = message.NewMessage(watermill.NewULID(), b)
+	return msg
+}
+
+func (changedPayload *ChangedPayload) UmarshMessage(msg *message.Message) (err error) {
+	err = json.Unmarshal(msg.Payload, changedPayload)
+	return err
+}
+
+func NewChangedPayload(eventType *string, id interface{}, befor interface{}, after interface{}) (changedPayload *ChangedPayload) {
+	changedPayload = &ChangedPayload{
+		EventType: eventType,
+		ID:        id,
+		Before:    befor,
+		After:     after,
+	}
+	return changedPayload
+}
+
 const (
-	EVENT_TYPE_CREATING = "creating"
-	EVENT_TYPE_CREATED  = "created"
-	EVENT_TYPE_UPDATING = "updating"
-	EVENT_TYPE_UPDATED  = "updated"
-	EVENT_TYPE_DELETING = "deleting"
-	EVENT_TYPE_DELETED  = "deleted"
+	EVENT_TYPE_CREATED = "created"
+	EVENT_TYPE_UPDATED = "updated"
+	EVENT_TYPE_DELETED = "deleted"
 )
 
 type Event struct {
@@ -69,14 +96,6 @@ type RunContext struct {
 	Input        Fields       `json:"input"`
 	Dependencies []RunContext `json:"Dependencies"`
 }
-
-type ProcessMessage struct {
-	ProcessName string       `json:"processName"`
-	Input       Fields       `json:"input"`
-	RunContexts []RunContext `json:"runContexts"` // 执行脚本上下文
-}
-
-type ProcessMessages []ProcessMessage
 
 type Field struct {
 	Name  string `json:"name"`

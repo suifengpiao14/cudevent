@@ -2,7 +2,7 @@ package repository
 
 import (
 	"github.com/spf13/cast"
-	"github.com/suifengpiao14/autofillcopyfield"
+	"github.com/suifengpiao14/syncdata"
 )
 
 type User struct {
@@ -21,23 +21,23 @@ const (
 )
 
 func (u User) emitUserUpdate() (err error) {
-	event := autofillcopyfield.Event{
+	event := syncdata.Event{
 		Topic:   EVENT_MODEL_NAME_USER_UPDATED,
 		EventID: EVENT_MODEL_NAME_USER_UPDATED,
-		Type:    autofillcopyfield.EVENT_TYPE_UPDATED,
-		SourceID: autofillcopyfield.Fields{
+		Type:    syncdata.EVENT_TYPE_UPDATED,
+		SourceID: syncdata.Fields{
 			{Name: "id", Value: cast.ToString(u.ID), Type: "int"},
 		},
 	}
 	if u.Name != "" {
-		event.OldAttr = autofillcopyfield.Fields{
+		event.OldAttr = syncdata.Fields{
 			{Name: "name", Value: "old_name", Type: "string"},
 		}
-		event.NewAttr = autofillcopyfield.Fields{
+		event.NewAttr = syncdata.Fields{
 			{Name: "name", Value: u.Name, Type: "string"},
 		}
 	}
-	_, err = autofillcopyfield.Publish(event)
+	err = syncdata.Publish(event)
 	if err != nil {
 		return err
 	}
@@ -46,19 +46,19 @@ func (u User) emitUserUpdate() (err error) {
 
 // func SubBlogCopyField1(b Blog) (err error) {
 
-// 	event := autofillcopyfield.EventWithSub{
-// 		Type: autofillcopyfield.EVENT_TYPE_CREATED,
-// 		Source: autofillcopyfield.ProcessMessage{
+// 	event := syncdata.EventWithSub{
+// 		Type: syncdata.EVENT_TYPE_CREATED,
+// 		Source: syncdata.ProcessMessage{
 // 			ProcessName: "sql",
-// 			RunContexts: []autofillcopyfield.RunContext{
+// 			RunContexts: []syncdata.RunContext{
 // 				{
 // 					Name:   "sql",
 // 					Config: `{"dsn":"root:1b03f8b486908bbe34ca2f4a4b91bd1c@ssh(127.0.0.1:3306)/ad?charset=utf8&timeout=5s&readTimeout=5s&writeTimeout=5s&parseTime=False&loc=Local&multiStatements=true"}`,
-// 					Input: autofillcopyfield.Fields{
-// 						autofillcopyfield.Field{Name: "id", Value: b.ID, Type: "int"},
+// 					Input: syncdata.Fields{
+// 						syncdata.Field{Name: "id", Value: b.ID, Type: "int"},
 // 					},
 // 					Script: "update blog set `user_name`='{{.userName}}' where id={{.id}};",
-// 					Dependencies: []autofillcopyfield.RunContext{
+// 					Dependencies: []syncdata.RunContext{
 // 						{
 // 							Name:   "sql",
 // 							Config: `{"dsn":"root:1b03f8b486908bbe34ca2f4a4b91bd1c@ssh(127.0.0.1:3306)/ad?charset=utf8&timeout=5s&readTimeout=5s&writeTimeout=5s&parseTime=False&loc=Local&multiStatements=true"}`,
@@ -67,8 +67,8 @@ func (u User) emitUserUpdate() (err error) {
 // 							version=http://json-schema.org/draft-07/schema,id=output,direction=out
 // 							fullname=username,src=getUserOut.0.name,required
 // 							`,
-// 							Input: autofillcopyfield.Fields{
-// 								autofillcopyfield.Field{Name: "id", Value: b.UserID, Type: "int"},
+// 							Input: syncdata.Fields{
+// 								syncdata.Field{Name: "id", Value: b.UserID, Type: "int"},
 // 							},
 // 						},
 // 					},
@@ -77,7 +77,7 @@ func (u User) emitUserUpdate() (err error) {
 // 		},
 // 	}
 // 	_ = event
-// 	/* 	_, err = autofillcopyfield.Publish(event)
+// 	/* 	_, err = syncdata.Publish(event)
 // 	   	if err != nil {
 // 	   		return err
 // 	   	} */

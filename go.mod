@@ -1,4 +1,4 @@
-module github.com/suifengpiao14/autofillcopyfield
+module github.com/suifengpiao14/syncdata
 
 go 1.18
 

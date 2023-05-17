@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cast"
-	"github.com/suifengpiao14/autofillcopyfield"
+	"github.com/suifengpiao14/syncdata"
 )
 
 func init() {
@@ -12,7 +12,7 @@ func init() {
 }
 
 const (
-	EVENT_MODEL_NAME_BLOG_CREATED = "blog_created"
+	EVENT_MODEL_NAME_BLOG_CREATED  = "blog_created"
 	EVENT_MODEL_NAME_BLOG_CREATING = "blog_creating"
 )
 
@@ -31,11 +31,11 @@ func (b Blog) AddBlog() (err error) {
 }
 
 func (b Blog) initSubscriber() {
-	autofillcopyfield.Subscriber(EVENT_MODEL_NAME_BLOG_CREATED, b.handlerBlogCreated)
-	autofillcopyfield.Subscriber(EVENT_MODEL_NAME_USER_UPDATED, b.handlerUserUpdated)
+	syncdata.Subscriber(EVENT_MODEL_NAME_BLOG_CREATED, b.handlerBlogCreated)
+	syncdata.Subscriber(EVENT_MODEL_NAME_USER_UPDATED, b.handlerUserUpdated)
 }
 
-func (b Blog) handlerUserUpdated(event *autofillcopyfield.Event) (err error) {
+func (b Blog) handlerUserUpdated(event *syncdata.Event) (err error) {
 	userName := ""
 	if !event.NewAttr.GetValue("name", &userName) {
 		return
@@ -46,7 +46,7 @@ func (b Blog) handlerUserUpdated(event *autofillcopyfield.Event) (err error) {
 	return nil
 }
 
-func (b Blog) handlerBlogCreated(event *autofillcopyfield.Event) (err error) {
+func (b Blog) handlerBlogCreated(event *syncdata.Event) (err error) {
 	blogID := 0
 	event.SourceID.GetValue("id", &blogID)
 	userID := 0
@@ -56,44 +56,20 @@ func (b Blog) handlerBlogCreated(event *autofillcopyfield.Event) (err error) {
 }
 
 func (b Blog) emitBlogCreated() (err error) {
-	event := autofillcopyfield.Event{
+	event := syncdata.Event{
 		Topic:   EVENT_MODEL_NAME_BLOG_CREATED,
 		EventID: EVENT_MODEL_NAME_BLOG_CREATED,
-		Type:    autofillcopyfield.EVENT_TYPE_CREATED,
-		SourceID: autofillcopyfield.Fields{
+		Type:    syncdata.EVENT_TYPE_CREATED,
+		SourceID: syncdata.Fields{
 			{Name: "id", Value: "1", Type: "int"},
 		},
-		NewAttr: autofillcopyfield.Fields{
+		NewAttr: syncdata.Fields{
 			{Name: "userId", Value: cast.ToString(b.UserID), Type: "int"},
 		},
 	}
-	_, err = autofillcopyfield.Publish(event)
+	err = syncdata.Publish(event)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (b Blog)handlerBlogCreating(){
-	
-}
-
-func (b Blog) emitBlogCreating() (err error) {
-	event := autofillcopyfield.Event{
-		Topic:   EVENT_MODEL_NAME_BLOG_CREATING,
-		EventID: EVENT_MODEL_NAME_BLOG_CREATING,
-		Type:    autofillcopyfield.EVENT_TYPE_CREATING,
-		SourceID: autofillcopyfield.Fields{
-			{Name: "id", Value: "1", Type: "int"},
-		},
-		NewAttr: autofillcopyfield.Fields{
-			{Name: "userId", Value: cast.ToString(b.UserID), Type: "int"},
-		},
-	}
-	_, err = autofillcopyfield.Publish(event)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-
