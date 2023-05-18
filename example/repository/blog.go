@@ -1,9 +1,7 @@
 package repository
 
 import (
-	"fmt"
-
-	"github.com/spf13/cast"
+	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/suifengpiao14/syncdata"
 )
 
@@ -35,39 +33,21 @@ func (b Blog) initSubscriber() {
 	syncdata.Subscriber(EVENT_MODEL_NAME_USER_UPDATED, b.handlerUserUpdated)
 }
 
-func (b Blog) handlerUserUpdated(event *syncdata.Event) (err error) {
-	userName := ""
-	if !event.NewAttr.GetValue("name", &userName) {
-		return
-	}
-	userID := 0
-	event.SourceID.GetValue("id", &userID)
-	fmt.Printf("todo: update blog table record's userName to `%s` which userId is %d \n", userName, userID)
+func (b Blog) handlerUserUpdated(msg *message.Message) (err error) {
 	return nil
 }
 
-func (b Blog) handlerBlogCreated(event *syncdata.Event) (err error) {
-	blogID := 0
-	event.SourceID.GetValue("id", &blogID)
-	userID := 0
-	event.NewAttr.GetValue("userId", &userID)
-	fmt.Printf("todo: update blog table record's userName  which id is %d, and userId is %d \n", blogID, userID)
+func (b Blog) handlerBlogCreated(msg *message.Message) (err error) {
 	return nil
 }
 
 func (b Blog) emitBlogCreated() (err error) {
-	event := syncdata.Event{
-		Topic:   EVENT_MODEL_NAME_BLOG_CREATED,
-		EventID: EVENT_MODEL_NAME_BLOG_CREATED,
-		Type:    syncdata.EVENT_TYPE_CREATED,
-		SourceID: syncdata.Fields{
-			{Name: "id", Value: "1", Type: "int"},
-		},
-		NewAttr: syncdata.Fields{
-			{Name: "userId", Value: cast.ToString(b.UserID), Type: "int"},
-		},
+	payload := syncdata.ChangedPayload{
+		EventType: syncdata.EVENT_TYPE_CREATED,
+		ID:        "1",
 	}
-	err = syncdata.Publish(event)
+
+	err = syncdata.Publish(EVENT_MODEL_NAME_BLOG_CREATED, payload)
 	if err != nil {
 		return err
 	}

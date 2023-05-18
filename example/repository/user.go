@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"github.com/spf13/cast"
 	"github.com/suifengpiao14/syncdata"
 )
 
@@ -21,23 +20,21 @@ const (
 )
 
 func (u User) emitUserUpdate() (err error) {
-	event := syncdata.Event{
-		Topic:   EVENT_MODEL_NAME_USER_UPDATED,
-		EventID: EVENT_MODEL_NAME_USER_UPDATED,
-		Type:    syncdata.EVENT_TYPE_UPDATED,
-		SourceID: syncdata.Fields{
-			{Name: "id", Value: cast.ToString(u.ID), Type: "int"},
-		},
+	payload := syncdata.ChangedPayload{
+		EventType: syncdata.EVENT_TYPE_UPDATED,
+		ID:        u.ID,
 	}
 	if u.Name != "" {
-		event.OldAttr = syncdata.Fields{
-			{Name: "name", Value: "old_name", Type: "string"},
+		payload.Before = User{
+			Name: "old_name",
 		}
-		event.NewAttr = syncdata.Fields{
-			{Name: "name", Value: u.Name, Type: "string"},
+		payload.After = User{
+			Name: u.Name,
 		}
+
 	}
-	err = syncdata.Publish(event)
+
+	err = syncdata.Publish(EVENT_MODEL_NAME_USER_UPDATED, payload)
 	if err != nil {
 		return err
 	}

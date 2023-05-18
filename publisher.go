@@ -8,8 +8,8 @@ import (
 )
 
 // Publish 发布消息
-func Publish(event Event) (err error) {
-	b, err := json.Marshal(event)
+func Publish(topic string, payload ChangedPayload) (err error) {
+	b, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
@@ -18,6 +18,6 @@ func Publish(event Event) (err error) {
 		Payload: b,
 	}
 	container := GetContainer()
-	err = container.publisher.Publish(event.Topic, &msg)
+	err = container.publisher.Publish(topic, &msg)
 	return err
 }

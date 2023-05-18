@@ -46,7 +46,7 @@ func NewContainer(topic string, publisher message.Publisher, subscriber message.
 
 // 变化前后的负载
 type ChangedPayload struct {
-	EventType *string     `json:"eventType"`
+	EventType string      `json:"eventType"`
 	ID        interface{} `json:"id"`
 	Before    interface{} `json:"befor"`
 	After     interface{} `json:"after"`
@@ -63,12 +63,11 @@ func (changedPayload *ChangedPayload) UmarshMessage(msg *message.Message) (err e
 	return err
 }
 
-func NewChangedPayload(eventType *string, id interface{}, befor interface{}, after interface{}) (changedPayload *ChangedPayload) {
+func NewChangedPayload(id interface{}, befor interface{}, after interface{}) (changedPayload *ChangedPayload) {
 	changedPayload = &ChangedPayload{
-		EventType: eventType,
-		ID:        id,
-		Before:    befor,
-		After:     after,
+		ID:     id,
+		Before: befor,
+		After:  after,
 	}
 	return changedPayload
 }
