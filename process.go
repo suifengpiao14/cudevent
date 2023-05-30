@@ -21,28 +21,12 @@ const (
 	TOPIC = "syncdata"
 )
 
-// 默认容器
-var defaultContainer = NewContainer(TOPIC, pubSub, pubSub)
-
-func GetContainer() *_Container {
-	return defaultContainer
+//GetMemoryPublisher 内置发布者
+var MemoryPublisherGetter = func() (publisher message.Publisher, err error) {
+	return pubSub, nil
 }
-func SetContainer(c *_Container) {
-	defaultContainer = c
-}
-
-type _Container struct {
-	publisher  message.Publisher
-	subscriber message.Subscriber
-}
-
-func NewContainer(topic string, publisher message.Publisher, subscriber message.Subscriber) (container *_Container) {
-
-	container = &_Container{
-		publisher:  publisher,
-		subscriber: subscriber,
-	}
-	return
+var MemorySubscriberGetter = func() (subscriber message.Subscriber, err error) {
+	return pubSub, nil
 }
 
 // 变化前后的负载

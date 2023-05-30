@@ -29,8 +29,8 @@ func (b Blog) AddBlog() (err error) {
 }
 
 func (b Blog) initSubscriber() {
-	syncdata.Subscriber(EVENT_MODEL_NAME_BLOG_CREATED, b.handlerBlogCreated)
-	syncdata.Subscriber(EVENT_MODEL_NAME_USER_UPDATED, b.handlerUserUpdated)
+	// syncdata.Subscriber(EVENT_MODEL_NAME_BLOG_CREATED, b.handlerBlogCreated)
+	// syncdata.Subscriber(EVENT_MODEL_NAME_USER_UPDATED, b.handlerUserUpdated)
 }
 
 func (b Blog) handlerUserUpdated(msg *message.Message) (err error) {

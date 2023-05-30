@@ -29,16 +29,26 @@ func (l SubscriberLogInfo) Error() error {
 	return l.err
 }
 
-type SubscriberFn func(msg *message.Message) (err error)
+type DealEventFn func(msg *message.Message) (err error)
 
-func Subscriber(topc string, fn SubscriberFn) (err error) {
-	messageChan, err := defaultContainer.subscriber.Subscribe(context.Background(), topc)
+//DealEventFnEmpty 不做任何处理，直接返回nil (可以用于跑流程)
+func DealEventFnEmpty(msg *message.Message) (err error) {
+	return nil
+}
+
+type GetSubscriberFn func() (subscriber message.Subscriber, err error)
+
+func Subscriber(topc string, getSubscriberFn GetSubscriberFn, fn DealEventFn) (err error) {
+	subscriber, err := getSubscriberFn()
+	if err != nil {
+		return err
+	}
+	messageChan, err := subscriber.Subscribe(context.Background(), topc)
 	if err != nil {
 		return err
 	}
 	go func() {
 		for msg := range messageChan {
-
 			err = fn(msg)
 			if err != nil {
 				msg.Nack()
