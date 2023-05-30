@@ -34,10 +34,10 @@ func (u User) emitUserUpdate() (err error) {
 
 	}
 
-	err = syncdata.Publish(EVENT_MODEL_NAME_USER_UPDATED, payload)
-	if err != nil {
-		return err
-	}
+	// err = syncdata.Publish(EVENT_MODEL_NAME_USER_UPDATED, *payload)
+	// if err != nil {
+	// 	return err
+	// }
 	return nil
 }
 

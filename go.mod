@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/ThreeDotsLabs/watermill v1.2.0
+	github.com/evanphx/json-patch v0.5.2
 	github.com/pkg/errors v0.9.1
 	github.com/suifengpiao14/logchan/v2 v2.0.12
 )

@@ -46,10 +46,11 @@ func (b Blog) emitBlogCreated() (err error) {
 		EventType: syncdata.EVENT_TYPE_CREATED,
 		ID:        "1",
 	}
+	_ = payload
 
-	err = syncdata.Publish(EVENT_MODEL_NAME_BLOG_CREATED, payload)
-	if err != nil {
-		return err
-	}
+	// err = syncdata.Publish(EVENT_MODEL_NAME_BLOG_CREATED, payload)
+	// if err != nil {
+	// 	return err
+	// }
 	return nil
 }

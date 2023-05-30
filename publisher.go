@@ -7,8 +7,11 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
+// GetPublisherFn 获取发布器函数
+type GetPublisherFn func() (publisher message.Publisher, err error)
+
 // Publish 发布消息
-func Publish(topic string, payload ChangedPayload) (err error) {
+func Publish(publisher message.Publisher, topic string, payload *ChangedPayload) (err error) {
 	b, err := json.Marshal(payload)
 	if err != nil {
 		return err
@@ -17,7 +20,6 @@ func Publish(topic string, payload ChangedPayload) (err error) {
 		UUID:    watermill.NewULID(),
 		Payload: b,
 	}
-	container := GetContainer()
-	err = container.publisher.Publish(topic, &msg)
+	err = publisher.Publish(topic, &msg)
 	return err
 }

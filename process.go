@@ -7,6 +7,7 @@ import (
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/spf13/cast"
 )
@@ -63,13 +64,21 @@ func (changedPayload *ChangedPayload) UmarshMessage(msg *message.Message) (err e
 	return err
 }
 
-func NewChangedPayload(id interface{}, befor interface{}, after interface{}) (changedPayload *ChangedPayload) {
+func NewChangedPayload(eventType string, id interface{}, befor interface{}, after interface{}) (changedPayload *ChangedPayload, err error) {
+	old, new := befor, after
+	if old != nil && new != nil { // 变化前后都有值时，对比保留发生变化的属性
+		old, new, err = Diff(befor, after)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	changedPayload = &ChangedPayload{
 		ID:     id,
-		Before: befor,
-		After:  after,
+		Before: old,
+		After:  new,
 	}
-	return changedPayload
+	return changedPayload, nil
 }
 
 const (
@@ -141,4 +150,42 @@ func (fields Fields) Map() (m map[string]interface{}) {
 		m[field.Name] = value
 	}
 	return m
+}
+
+var ERROR_NO_DIFF_PATCH = errors.Errorf("no diff patch")
+
+//Diff 比较2个结构体，提取前后有变化的内容(属性)
+func Diff(befor interface{}, after interface{}) (old interface{}, new interface{}, err error) {
+	rt := reflect.Indirect(reflect.ValueOf(befor)).Type()
+	old, new = reflect.New(rt).Interface(), reflect.New(rt).Interface()
+	bforeByte, err := json.Marshal(befor)
+	if err != nil {
+		return nil, nil, err
+	}
+	afterByte, err := json.Marshal(after)
+	if err != nil {
+		return nil, nil, err
+	}
+	newPatch, err := jsonpatch.CreateMergePatch(bforeByte, afterByte)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = json.Unmarshal(newPatch, &new)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	oldPatch, err := jsonpatch.CreateMergePatch(afterByte, bforeByte)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(oldPatch) == 0 {
+		return nil, nil, ERROR_NO_DIFF_PATCH
+	}
+
+	err = json.Unmarshal(oldPatch, &old)
+	if err != nil {
+		return nil, nil, err
+	}
+	return old, new, nil
 }

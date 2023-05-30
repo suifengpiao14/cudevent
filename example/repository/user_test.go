@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -22,4 +23,12 @@ func TestUpdateUser(t *testing.T) {
 	})
 
 	time.Sleep(3 * time.Second)
+}
+
+func TestForGo(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		go func(i int) {
+			fmt.Println(i)
+		}(i)
+	}
 }
