@@ -31,13 +31,13 @@ func (cud CUDEventEmiter) GetTopic(domain string) (topic string) {
 //EmitCreatedEvent 创建完成后,发起创建完成领域事件
 func (cud CUDEventEmiter) EmitCreatedEvent(after CUDEntity) (err error) {
 	topic := cud.GetTopic(after.GetDomain())
-	return cud.emitEvent(topic, syncdata.EVENT_TYPE_DELETED, after.GetIdentity(), nil, after)
+	return cud.emitEvent(topic, syncdata.EVENT_TYPE_CREATED, after.GetIdentity(), nil, after)
 }
 
 //EmitUpdatedEvent 更新完成后,发起更新完成领域事件
 func (cud CUDEventEmiter) EmitUpdatedEvent(before CUDEntity, after CUDEntity) (err error) {
 	topic := cud.GetTopic(after.GetDomain())
-	return cud.emitEvent(topic, syncdata.EVENT_TYPE_DELETED, after.GetIdentity(), before, after)
+	return cud.emitEvent(topic, syncdata.EVENT_TYPE_UPDATED, after.GetIdentity(), before, after)
 }
 
 //EmitUpdatedEvent 删除完成后,发起删除完成领域事件

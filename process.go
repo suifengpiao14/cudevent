@@ -58,9 +58,10 @@ func NewChangedPayload(eventType string, id interface{}, befor interface{}, afte
 	}
 
 	changedPayload = &ChangedPayload{
-		ID:     id,
-		Before: old,
-		After:  new,
+		EventType: eventType,
+		ID:        id,
+		Before:    old,
+		After:     new,
 	}
 	return changedPayload, nil
 }
