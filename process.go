@@ -21,6 +21,19 @@ const (
 	TOPIC = "syncdata"
 )
 
+var defaultPublisher message.Publisher
+
+func SetDefaultPublisher(publisher message.Publisher) {
+	if defaultPublisher == nil {
+		defaultPublisher = publisher
+	}
+}
+
+func GetDefaultPublisher() (publisher message.Publisher) {
+
+	return defaultPublisher
+}
+
 //GetMemoryPublisher 内置发布者
 var MemoryPublisherGetter = func() (publisher message.Publisher, err error) {
 	return pubSub, nil

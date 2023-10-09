@@ -16,7 +16,7 @@ func (l LogName) String() string {
 const LOG_INFO_SUBSCRIBER LogName = "LOG_INFO_SUBSCRIBER"
 
 type SubscriberLogInfo struct {
-	Msg   message.Message
+	Msg   string
 	Event Event
 	err   error
 }
