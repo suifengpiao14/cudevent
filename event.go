@@ -1,4 +1,4 @@
-package syncdata
+package cudevent
 
 import (
 	"encoding/json"

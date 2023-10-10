@@ -1,4 +1,4 @@
-module github.com/suifengpiao14/syncdata
+module github.com/suifengpiao14/cudevent
 
 go 1.18
 
