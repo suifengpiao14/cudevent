@@ -15,13 +15,13 @@ func makeTopic(domain string) (topic string) {
 
 // 增改删 操作广播领域事件
 type CUDEmiterInterface interface {
-	GetIdentity() any
+	GetIdentity() string
 	GetDomain() string
 }
 
 type CUDEmiterInterfaces []CUDEmiterInterface
 
-func (emiters CUDEmiterInterfaces) GetByIdentity(identity any) (emiter CUDEmiterInterface, ok bool) {
+func (emiters CUDEmiterInterfaces) GetByIdentity(identity string) (emiter CUDEmiterInterface, ok bool) {
 	for _, e := range emiters {
 		if identity == emiter.GetIdentity() {
 			return e, true
@@ -66,7 +66,7 @@ func EmitUpdatedEvent(beforeModels CUDEmiterInterfaces, afterModels CUDEmiterInt
 		err = errors.WithMessagef(ERROR_UPDATE_MODEL_COUNT_BEFORE_AFTER, "befor count:%d,after count:%d", beforeCount, afterCount)
 		return
 	}
-	afterModelMap := make(map[any]CUDEmiterInterface)
+	afterModelMap := make(map[string]CUDEmiterInterface)
 	for _, afterModel := range afterModels {
 		afterModelMap[afterModel.GetIdentity()] = afterModel
 	}

@@ -2,7 +2,7 @@ package cudevent
 
 type CUDModelInterface interface {
 	CUDEmiterInterface
-	GetByIdentities(ids ...any) (models CUDEmiterInterfaces, err error)
+	GetByIdentities(ids ...string) (models CUDEmiterInterfaces, err error)
 }
 
 type CUDModel struct {
@@ -16,8 +16,8 @@ func NewCUDModel(cudModelImpl CUDModelInterface) (cudModel *CUDModel) {
 }
 
 // CUDUpdateHandleFn 增改删句柄函数
-type CUDUpdateHandleFn func(identifies ...any) (err error)
-type CUDAddHandleFn func() (identifies []any, err error)
+type CUDUpdateHandleFn func(identifies ...string) (err error)
+type CUDAddHandleFn func() (identifies []string, err error)
 
 func (cudModel CUDModel) AddModel(addFn CUDAddHandleFn) (err error) {
 	ids, err := addFn()
@@ -35,7 +35,7 @@ func (cudModel CUDModel) AddModel(addFn CUDAddHandleFn) (err error) {
 	return nil
 }
 
-func (cudModel CUDModel) UpdateModel(updateFn CUDUpdateHandleFn, ids ...any) (err error) {
+func (cudModel CUDModel) UpdateModel(updateFn CUDUpdateHandleFn, ids ...string) (err error) {
 	oldModels, err := cudModel.GetByIdentities(ids...)
 	if err != nil {
 		return err
@@ -56,7 +56,7 @@ func (cudModel CUDModel) UpdateModel(updateFn CUDUpdateHandleFn, ids ...any) (er
 	return nil
 }
 
-func (cudModel CUDModel) DelModel(deleteFn CUDUpdateHandleFn, ids ...any) (err error) {
+func (cudModel CUDModel) DelModel(deleteFn CUDUpdateHandleFn, ids ...string) (err error) {
 	model, err := cudModel.GetByIdentities(ids...)
 	if err != nil {
 		return err
