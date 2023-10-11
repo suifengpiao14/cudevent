@@ -2,65 +2,66 @@ package cudevent
 
 type CUDModelInterface interface {
 	CUDEmiterInterface
-	GetByIdentity(id string) (model CUDEmiterInterface, err error)
+	GetByIdentities(ids ...any) (models CUDEmiterInterfaces, err error)
 }
 
-type _CUDModel struct {
+type CUDModel struct {
 	CUDModelInterface
 }
 
-func NewCUDModel(cudModelImpl CUDModelInterface) (cudModel _CUDModel) {
-	return _CUDModel{
+func NewCUDModel(cudModelImpl CUDModelInterface) (cudModel *CUDModel) {
+	return &CUDModel{
 		CUDModelInterface: cudModelImpl,
 	}
 }
 
-// CUDHandleFn 增改删句柄函数
-type CUDHandleFn func() (id string, err error)
+// CUDUpdateHandleFn 增改删句柄函数
+type CUDUpdateHandleFn func(identifies ...any) (err error)
+type CUDAddHandleFn func() (identifies []any, err error)
 
-func (cudModel _CUDModel) AddModel(addFn CUDHandleFn) (err error) {
-	id, err := addFn()
+func (cudModel CUDModel) AddModel(addFn CUDAddHandleFn) (err error) {
+	ids, err := addFn()
 	if err != nil {
 		return err
 	}
-	model, err := cudModel.GetByIdentity(id)
+	models, err := cudModel.GetByIdentities(ids...)
 	if err != nil {
 		return err
 	}
-	err = EmitCreatedEvent(model)
+	err = EmitCreatedEvent(models...)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (cudModel _CUDModel) UpdateModel(id string, updateFn CUDHandleFn) (err error) {
-	model, err := cudModel.GetByIdentity(id)
+func (cudModel CUDModel) UpdateModel(updateFn CUDUpdateHandleFn, ids ...any) (err error) {
+	oldModels, err := cudModel.GetByIdentities(ids...)
 	if err != nil {
 		return err
 	}
-	_, err = updateFn()
+	err = updateFn(ids...)
 	if err != nil {
 		return err
 	}
-	newmodel, err := cudModel.GetByIdentity(id)
+	newmodels, err := cudModel.GetByIdentities(ids...)
 	if err != nil {
 		return err
 	}
 
-	err = EmitUpdatedEvent(model, newmodel)
+	err = EmitUpdatedEvent(oldModels, newmodels)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (cudModel _CUDModel) DelModel(id string, deleteFn CUDHandleFn) (err error) {
-	model, err := cudModel.GetByIdentity(id)
+func (cudModel CUDModel) DelModel(deleteFn CUDUpdateHandleFn, ids ...any) (err error) {
+	model, err := cudModel.GetByIdentities(ids...)
 	if err != nil {
 		return err
 	}
-	_, err = deleteFn()
+	err = deleteFn(ids...)
 	if err != nil {
 		return err
 	}

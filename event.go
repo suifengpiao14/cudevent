@@ -11,40 +11,52 @@ import (
 )
 
 // 变化前后的负载
-type _ChangedPayload struct {
-	EventType string      `json:"eventType"`
-	ID        interface{} `json:"id"`
-	Before    interface{} `json:"befor"`
-	After     interface{} `json:"after"`
+type _ChangedMessage struct {
+	Domain    string     `json:"domain"`
+	EventType string     `json:"eventType"`
+	Payload   []_Payload `json:"payload"`
 }
 
-func (changedPayload _ChangedPayload) ToMessage() (msg *message.Message) {
+type _Payload struct {
+	ID     any `json:"id"`
+	Before any `json:"befor"`
+	After  any `json:"after"`
+}
+
+func (changedPayload _ChangedMessage) ToMessage() (msg *message.Message) {
 	b, _ := json.Marshal(changedPayload)
 	msg = message.NewMessage(watermill.NewULID(), b)
 	return msg
 }
 
-func (changedPayload *_ChangedPayload) UmarshMessage(msg *message.Message) (err error) {
+func (changedPayload *_ChangedMessage) UmarshMessage(msg *message.Message) (err error) {
 	err = json.Unmarshal(msg.Payload, changedPayload)
 	return err
 }
 
-func newChangedPayload(eventType string, id interface{}, befor interface{}, after interface{}) (changedPayload *_ChangedPayload, err error) {
-	old, new := befor, after
-	if old != nil && new != nil { // 变化前后都有值时，对比保留发生变化的属性
-		old, new, err = diff(befor, after)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	changedPayload = &_ChangedPayload{
+func newChangedPayload(domain string, eventType string, beforEmiters CUDEmiterInterfaces, afterEmiters CUDEmiterInterfaces) (changedMessage *_ChangedMessage, err error) {
+	changedMessage = &_ChangedMessage{
+		Domain:    domain,
 		EventType: eventType,
-		ID:        id,
-		Before:    old,
-		After:     new,
+		Payload:   make([]_Payload, 0),
 	}
-	return changedPayload, nil
+	for _, befor := range beforEmiters {
+		after, _ := afterEmiters.GetByIdentity(befor.GetIdentity())
+		var old, new any
+		if befor != nil && after != nil { // 变化前后都有值时，对比保留发生变化的属性
+			old, new, err = diff(befor, after)
+			if err != nil {
+				return nil, err
+			}
+		}
+		payload := _Payload{
+			ID:     befor.GetIdentity(),
+			Before: old,
+			After:  new,
+		}
+		changedMessage.Payload = append(changedMessage.Payload, payload)
+	}
+	return changedMessage, nil
 }
 
 var ERROR_NO_DIFF_PATCH = errors.Errorf("no diff patch")

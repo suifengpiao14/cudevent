@@ -17,7 +17,7 @@ var pubSub = gochannel.NewGoChannel(
 )
 
 // publish 发布消息
-func publish(topic string, payload *_ChangedPayload) (err error) {
+func publish(topic string, payload *_ChangedMessage) (err error) {
 	b, err := json.Marshal(payload)
 	if err != nil {
 		return err
@@ -30,8 +30,9 @@ func publish(topic string, payload *_ChangedPayload) (err error) {
 	return err
 }
 
-//AddSubscriber 增加订阅者
-func AddSubscriber(ctx context.Context, topic string, fn func(msg *message.Message) (err error)) (err error) {
+//Subscriber 增加订阅者
+func Subscriber(ctx context.Context, domain string, fn func(msg *message.Message) (err error)) (err error) {
+	topic := makeTopic(domain)
 	messageChan, err := pubSub.Subscribe(context.Background(), topic)
 	if err != nil {
 		return err
