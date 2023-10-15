@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var TOPIC_FORMAT = "%s.cud"
+var TOPIC_FORMAT = "cud.%s"
 
 func makeTopic(domain string) (topic string) {
 	topic = fmt.Sprintf(TOPIC_FORMAT, domain)

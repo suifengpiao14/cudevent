@@ -34,13 +34,25 @@ func (changedPayload *_ChangedMessage) UmarshMessage(msg *message.Message) (err 
 	return err
 }
 
-func newChangedPayload(domain string, eventType string, beforEmiters CUDEmiterInterfaces, afterEmiters CUDEmiterInterfaces) (changedMessage *_ChangedMessage, err error) {
+func newChangedPayload(domain string, eventType string, beforeEmiters CUDEmiterInterfaces, afterEmiters CUDEmiterInterfaces) (changedMessage *_ChangedMessage, err error) {
 	changedMessage = &_ChangedMessage{
 		Domain:    domain,
 		EventType: eventType,
 		Payload:   make([]_Payload, 0),
 	}
-	for _, befor := range beforEmiters {
+	if len(beforeEmiters) == 0 && len(afterEmiters) > 0 {
+		after := afterEmiters[0]
+		payload := diffEmiter2Payload(after.GetIdentity(), nil, afterEmiters)
+		changedMessage.Payload = append(changedMessage.Payload, payload)
+		return
+	}
+	if len(afterEmiters) == 0 && len(beforeEmiters) > 0 {
+		before := beforeEmiters[0]
+		payload := diffEmiter2Payload(before.GetIdentity(), nil, beforeEmiters)
+		changedMessage.Payload = append(changedMessage.Payload, payload)
+		return
+	}
+	for _, befor := range beforeEmiters {
 		after, _ := afterEmiters.GetByIdentity(befor.GetIdentity())
 		var old, new any
 		if befor != nil && after != nil { // 变化前后都有值时，对比保留发生变化的属性
@@ -49,19 +61,25 @@ func newChangedPayload(domain string, eventType string, beforEmiters CUDEmiterIn
 				return nil, err
 			}
 		}
-		payload := _Payload{
-			ID:     befor.GetIdentity(),
-			Before: old,
-			After:  new,
-		}
+		payload := diffEmiter2Payload(befor.GetIdentity(), old, new)
 		changedMessage.Payload = append(changedMessage.Payload, payload)
 	}
 	return changedMessage, nil
 }
 
+func diffEmiter2Payload(id string, old any, new any) (payload _Payload) {
+	payload = _Payload{
+		ID:     id,
+		Before: old,
+		After:  new,
+	}
+	return payload
+
+}
+
 var ERROR_NO_DIFF_PATCH = errors.Errorf("no diff patch")
 
-//diff 比较2个结构体，提取前后有变化的内容(属性)
+// diff 比较2个结构体，提取前后有变化的内容(属性)
 func diff(befor interface{}, after interface{}) (old interface{}, new interface{}, err error) {
 	rt := reflect.Indirect(reflect.ValueOf(befor)).Type()
 	old, new = reflect.New(rt).Interface(), reflect.New(rt).Interface()

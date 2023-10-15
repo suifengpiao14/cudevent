@@ -13,11 +13,13 @@ import (
 // pubSub 固定不可变的go channel
 var pubSub = gochannel.NewGoChannel(
 	gochannel.Config{},
-	watermill.NopLogger{},
+	watermill.NewStdLogger(true, true),
+	//watermill.NopLogger{},
 )
 
 // publish 发布消息
-func publish(topic string, payload *_ChangedMessage) (err error) {
+func publish(domain string, payload *_ChangedMessage) (err error) {
+	topic := makeTopic(domain)
 	b, err := json.Marshal(payload)
 	if err != nil {
 		return err
@@ -30,7 +32,7 @@ func publish(topic string, payload *_ChangedMessage) (err error) {
 	return err
 }
 
-//Subscriber 增加订阅者
+// Subscriber 增加订阅者
 func Subscriber(ctx context.Context, domain string, fn func(msg *message.Message) (err error)) (err error) {
 	topic := makeTopic(domain)
 	messageChan, err := pubSub.Subscribe(context.Background(), topic)
