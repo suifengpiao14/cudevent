@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var TOPIC_FORMAT = "%s.cud"
+var TOPIC_FORMAT = "cud.%s"
 
 func makeTopic(domain string) (topic string) {
 	topic = fmt.Sprintf(TOPIC_FORMAT, domain)
@@ -23,7 +23,7 @@ type CUDEmiterInterfaces []CUDEmiterInterface
 
 func (emiters CUDEmiterInterfaces) GetByIdentity(identity string) (emiter CUDEmiterInterface, ok bool) {
 	for _, e := range emiters {
-		if identity == emiter.GetIdentity() {
+		if identity == e.GetIdentity() {
 			return e, true
 		}
 	}
@@ -44,7 +44,7 @@ var (
 	ERROR_UPDATE_MODEL_DOMAIN_INCONSISTENT          = errors.New("Inconsistent model domains")
 )
 
-//EmitCreatedEvent 创建完成后,发起创建完成领域事件
+// EmitCreatedEvent 创建完成后,发起创建完成领域事件
 func EmitCreatedEvent(afterModels ...CUDEmiterInterface) (err error) {
 	if len(afterModels) == 0 {
 		return ERROR_MODELS_NUMBER
@@ -53,7 +53,7 @@ func EmitCreatedEvent(afterModels ...CUDEmiterInterface) (err error) {
 	return emitEvent(afterModel.GetDomain(), EVENT_TYPE_CREATED, nil, afterModels)
 }
 
-//EmitUpdatedEvent 更新完成后,发起更新完成领域事件
+// EmitUpdatedEvent 更新完成后,发起更新完成领域事件
 func EmitUpdatedEvent(beforeModels CUDEmiterInterfaces, afterModels CUDEmiterInterfaces) (err error) {
 	if len(afterModels) == 0 {
 		return ERROR_MODELS_NUMBER
@@ -99,7 +99,7 @@ func EmitUpdatedEvent(beforeModels CUDEmiterInterfaces, afterModels CUDEmiterInt
 	return emitEvent(afterModel.GetDomain(), EVENT_TYPE_UPDATED, beforeModels, afterModels)
 }
 
-//EmitUpdatedEvent 删除完成后,发起删除完成领域事件
+// EmitUpdatedEvent 删除完成后,发起删除完成领域事件
 func EmitDeletedEvent(beforeModels CUDEmiterInterfaces) (err error) {
 	if len(beforeModels) == 0 {
 		return ERROR_MODELS_NUMBER
