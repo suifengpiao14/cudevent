@@ -1,8 +1,10 @@
 package cudevent
 
+import "context"
+
 type CUDModelInterface interface {
 	CUDEmiterInterface
-	GetByIdentities(ids ...string) (models CUDEmiterInterfaces, err error)
+	GetByIdentities(ctx context.Context, ids ...string) (models CUDEmiterInterfaces, err error)
 }
 
 type CUDModel struct {
@@ -19,12 +21,12 @@ func NewCUDModel(cudModelImpl CUDModelInterface) (cudModel *CUDModel) {
 type CUDUpdateHandleFn func(identifies ...string) (err error)
 type CUDAddHandleFn func(uniqIds ...string) (identifies []string, err error)
 
-func (cudModel CUDModel) AddModel(addFn CUDAddHandleFn) (err error) {
+func (cudModel CUDModel) AddModel(ctx context.Context, addFn CUDAddHandleFn) (err error) {
 	ids, err := addFn()
 	if err != nil {
 		return err
 	}
-	models, err := cudModel.GetByIdentities(ids...)
+	models, err := cudModel.GetByIdentities(ctx, ids...)
 	if err != nil {
 		return err
 	}
@@ -35,8 +37,8 @@ func (cudModel CUDModel) AddModel(addFn CUDAddHandleFn) (err error) {
 	return nil
 }
 
-func (cudModel CUDModel) UpdateModel(updateFn CUDUpdateHandleFn, ids ...string) (err error) {
-	oldModels, err := cudModel.GetByIdentities(ids...)
+func (cudModel CUDModel) UpdateModel(ctx context.Context, updateFn CUDUpdateHandleFn, ids ...string) (err error) {
+	oldModels, err := cudModel.GetByIdentities(ctx, ids...)
 	if err != nil {
 		return err
 	}
@@ -44,7 +46,7 @@ func (cudModel CUDModel) UpdateModel(updateFn CUDUpdateHandleFn, ids ...string) 
 	if err != nil {
 		return err
 	}
-	newmodels, err := cudModel.GetByIdentities(ids...)
+	newmodels, err := cudModel.GetByIdentities(ctx, ids...)
 	if err != nil {
 		return err
 	}
@@ -57,8 +59,8 @@ func (cudModel CUDModel) UpdateModel(updateFn CUDUpdateHandleFn, ids ...string) 
 }
 
 // SetModel 筛选出新增发布创建事件，更新发布更新事件
-func (cudModel CUDModel) SetModel(addFn CUDAddHandleFn, updateFn CUDUpdateHandleFn, ids ...string) (err error) {
-	oldModels, err := cudModel.GetByIdentities(ids...)
+func (cudModel CUDModel) SetModel(ctx context.Context, addFn CUDAddHandleFn, updateFn CUDUpdateHandleFn, ids ...string) (err error) {
+	oldModels, err := cudModel.GetByIdentities(ctx, ids...)
 	if err != nil {
 		return err
 	}
@@ -93,7 +95,7 @@ func (cudModel CUDModel) SetModel(addFn CUDAddHandleFn, updateFn CUDUpdateHandle
 		}
 	}
 
-	newmodels, err := cudModel.GetByIdentities(ids...)
+	newmodels, err := cudModel.GetByIdentities(ctx, ids...)
 	if err != nil {
 		return err
 	}
@@ -134,8 +136,8 @@ func (cudModel CUDModel) SetModel(addFn CUDAddHandleFn, updateFn CUDUpdateHandle
 	return nil
 }
 
-func (cudModel CUDModel) DelModel(deleteFn CUDUpdateHandleFn, ids ...string) (err error) {
-	model, err := cudModel.GetByIdentities(ids...)
+func (cudModel CUDModel) DelModel(ctx context.Context, deleteFn CUDUpdateHandleFn, ids ...string) (err error) {
+	model, err := cudModel.GetByIdentities(ctx, ids...)
 	if err != nil {
 		return err
 	}
