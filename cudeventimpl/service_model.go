@@ -1,19 +1,23 @@
-package cudevent
+package cudeventimpl
 
-import "context"
+import (
+	"context"
 
-type CUDModelInterface interface {
-	CUDEmiterInterface
-	GetByIdentities(ctx context.Context, ids ...string) (models CUDEmiterInterfaces, err error)
+	"github.com/suifengpiao14/cudevent"
+)
+
+type CUDModelI interface {
+	cudevent.CUDEmiterI
+	GetByIdentities(ctx context.Context, ids ...string) (models cudevent.CUDEmiter, err error)
 }
 
 type CUDModel struct {
-	CUDModelInterface
+	CUDModelI
 }
 
-func NewCUDModel(cudModelImpl CUDModelInterface) (cudModel *CUDModel) {
+func NewCUDModel(cudModelImpl CUDModelI) (cudModel *CUDModel) {
 	return &CUDModel{
-		CUDModelInterface: cudModelImpl,
+		CUDModelI: cudModelImpl,
 	}
 }
 
@@ -30,7 +34,7 @@ func (cudModel CUDModel) AddModel(ctx context.Context, addFn CUDAddHandleFn) (er
 	if err != nil {
 		return err
 	}
-	err = EmitCreatedEvent(models...)
+	err = cudevent.EmitCreatedEvent(models...)
 	if err != nil {
 		return err
 	}
@@ -51,7 +55,7 @@ func (cudModel CUDModel) UpdateModel(ctx context.Context, updateFn CUDUpdateHand
 		return err
 	}
 
-	err = EmitUpdatedEvent(oldModels, newmodels)
+	err = cudevent.EmitUpdatedEvent(oldModels, newmodels)
 	if err != nil {
 		return err
 	}
@@ -99,8 +103,8 @@ func (cudModel CUDModel) SetModel(ctx context.Context, addFn CUDAddHandleFn, upd
 	if err != nil {
 		return err
 	}
-	insertModels := make(CUDEmiterInterfaces, 0)
-	updateModels := make(CUDEmiterInterfaces, 0)
+	insertModels := make(cudevent.CUDEmiter, 0)
+	updateModels := make(cudevent.CUDEmiter, 0)
 
 	for _, model := range newmodels {
 		isInsertModel := false
@@ -120,14 +124,14 @@ func (cudModel CUDModel) SetModel(ctx context.Context, addFn CUDAddHandleFn, upd
 	}
 
 	if len(insertModels) > 0 {
-		err = EmitCreatedEvent(insertModels...)
+		err = cudevent.EmitCreatedEvent(insertModels...)
 		if err != nil {
 			return err
 		}
 	}
 
 	if len(oldModels) > 0 && len(updateModels) > 0 {
-		err = EmitUpdatedEvent(oldModels, updateModels)
+		err = cudevent.EmitUpdatedEvent(oldModels, updateModels)
 		if err != nil {
 			return err
 		}
@@ -146,7 +150,7 @@ func (cudModel CUDModel) DelModel(ctx context.Context, deleteFn CUDUpdateHandleF
 		return err
 	}
 
-	err = EmitDeletedEvent(model)
+	err = cudevent.EmitDeletedEvent(model)
 	if err != nil {
 		return err
 	}

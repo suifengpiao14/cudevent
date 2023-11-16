@@ -34,7 +34,7 @@ func (changedPayload *_ChangedMessage) UmarshMessage(msg *message.Message) (err 
 	return err
 }
 
-func newChangedPayload(domain string, eventType string, beforeEmiters CUDEmiterInterfaces, afterEmiters CUDEmiterInterfaces) (changedMessage *_ChangedMessage, err error) {
+func newChangedPayload(domain string, eventType string, beforeEmiters CUDEmiter, afterEmiters CUDEmiter) (changedMessage *_ChangedMessage, err error) {
 	changedMessage = &_ChangedMessage{
 		Domain:    domain,
 		EventType: eventType,

@@ -14,14 +14,14 @@ func makeTopic(domain string) (topic string) {
 }
 
 // 增改删 操作广播领域事件
-type CUDEmiterInterface interface {
+type CUDEmiterI interface {
 	GetIdentity() string
 	GetDomain() string
 }
 
-type CUDEmiterInterfaces []CUDEmiterInterface
+type CUDEmiter []CUDEmiterI
 
-func (emiters CUDEmiterInterfaces) GetByIdentity(identity string) (emiter CUDEmiterInterface, ok bool) {
+func (emiters CUDEmiter) GetByIdentity(identity string) (emiter CUDEmiterI, ok bool) {
 	for _, e := range emiters {
 		if identity == e.GetIdentity() {
 			return e, true
@@ -45,7 +45,7 @@ var (
 )
 
 // EmitCreatedEvent 创建完成后,发起创建完成领域事件
-func EmitCreatedEvent(afterModels ...CUDEmiterInterface) (err error) {
+func EmitCreatedEvent(afterModels ...CUDEmiterI) (err error) {
 	if len(afterModels) == 0 {
 		return ERROR_MODELS_NUMBER
 	}
@@ -54,7 +54,7 @@ func EmitCreatedEvent(afterModels ...CUDEmiterInterface) (err error) {
 }
 
 // EmitUpdatedEvent 更新完成后,发起更新完成领域事件
-func EmitUpdatedEvent(beforeModels CUDEmiterInterfaces, afterModels CUDEmiterInterfaces) (err error) {
+func EmitUpdatedEvent(beforeModels CUDEmiter, afterModels CUDEmiter) (err error) {
 	if len(afterModels) == 0 {
 		return ERROR_MODELS_NUMBER
 	}
@@ -66,11 +66,11 @@ func EmitUpdatedEvent(beforeModels CUDEmiterInterfaces, afterModels CUDEmiterInt
 		err = errors.WithMessagef(ERROR_UPDATE_MODEL_COUNT_BEFORE_AFTER, "befor count:%d,after count:%d", beforeCount, afterCount)
 		return
 	}
-	afterModelMap := make(map[string]CUDEmiterInterface)
+	afterModelMap := make(map[string]CUDEmiterI)
 	for _, afterModel := range afterModels {
 		afterModelMap[afterModel.GetIdentity()] = afterModel
 	}
-	domainCheckMap := make(map[string]CUDEmiterInterface)
+	domainCheckMap := make(map[string]CUDEmiterI)
 	for _, beforeModel := range beforeModels {
 		afterModel, ok := afterModelMap[beforeModel.GetIdentity()]
 		if !ok {
@@ -85,7 +85,7 @@ func EmitUpdatedEvent(beforeModels CUDEmiterInterfaces, afterModels CUDEmiterInt
 			domainCheckMap[beforeModel.GetDomain()] = beforeModel
 		} else {
 			if _, ok := domainCheckMap[beforeModel.GetDomain()]; !ok {
-				var existsModel CUDEmiterInterface
+				var existsModel CUDEmiterI
 				for _, existsModel = range domainCheckMap {
 					break
 				}
@@ -100,7 +100,7 @@ func EmitUpdatedEvent(beforeModels CUDEmiterInterfaces, afterModels CUDEmiterInt
 }
 
 // EmitUpdatedEvent 删除完成后,发起删除完成领域事件
-func EmitDeletedEvent(beforeModels CUDEmiterInterfaces) (err error) {
+func EmitDeletedEvent(beforeModels CUDEmiter) (err error) {
 	if len(beforeModels) == 0 {
 		return ERROR_MODELS_NUMBER
 	}
@@ -108,7 +108,7 @@ func EmitDeletedEvent(beforeModels CUDEmiterInterfaces) (err error) {
 	return emitEvent(beforeModel.GetDomain(), EVENT_TYPE_DELETED, beforeModels, nil)
 }
 
-func emitEvent(domain string, eventType string, before CUDEmiterInterfaces, afterModels CUDEmiterInterfaces) (err error) {
+func emitEvent(domain string, eventType string, before CUDEmiter, afterModels CUDEmiter) (err error) {
 	changedPayload, err := newChangedPayload(domain, eventType, before, afterModels)
 	if err != nil {
 		return err
