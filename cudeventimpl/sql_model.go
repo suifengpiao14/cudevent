@@ -43,7 +43,7 @@ func CUDEventPackHandler(db *sql.DB) (packHandler stream.PackHandler) {
 		stmt := sqlRawEvent.stmt
 		switch stmt.(type) {
 		case *sqlparser.Insert:
-			sqlRawEvent.LastInsertId = string(input)
+			sqlRawEvent.LastInsertId = cast.ToInt64(string(input))
 		case *sqlparser.Update:
 			sqlRawEvent.RowsAffected = cast.ToInt64(string(input))
 		}
@@ -131,7 +131,7 @@ type SQLRawEvent struct {
 	stmt         sqlparser.Statement
 	DB           *sql.DB
 	SQL          string `json:"sql"`
-	LastInsertId string `json:"lastInsertId"`
+	LastInsertId int64  `json:"lastInsertId"`
 	RowsAffected int64  `json:"affectedRows"`
 	BeforeData   string // update 更新前的数据
 }
@@ -191,7 +191,7 @@ func PublishSQLRawEventAsync(sqlRawEvent *SQLRawEvent) {
 
 }
 
-//getIdentityFromWhere 从where 条件中获取主键条件——需完善
+// getIdentityFromWhere 从where 条件中获取主键条件——需完善
 func getIdentityFromWhere(whereExpr sqlparser.Expr, identityKey string) (expr sqlparser.Expr) {
 	colIdent := sqlparser.NewColIdent(identityKey)
 	identityCol := &sqlparser.ColName{Name: colIdent}
