@@ -15,6 +15,7 @@ func makeTopic(domain string) (topic string) {
 
 // 增改删 操作广播领域事件
 type CUDEmiterI interface {
+	DiffI
 	GetIdentity() string
 	GetDomain() string
 }

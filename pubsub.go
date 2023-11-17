@@ -9,11 +9,13 @@ import (
 	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
 )
 
+var DEBUG = false
+
 // pubSub 事件发布器，使用最简单的go channel发布订阅作为解耦业务和通信，如需发布到其它消息队列可专注从go channel中获取消息转发，无需耦合业务
 // pubSub 固定不可变的go channel
 var pubSub = gochannel.NewGoChannel(
 	gochannel.Config{},
-	watermill.NewStdLogger(true, true),
+	watermill.NewStdLogger(DEBUG, DEBUG),
 	//watermill.NopLogger{},
 )
 
