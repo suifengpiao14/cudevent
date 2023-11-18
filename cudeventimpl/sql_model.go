@@ -3,6 +3,7 @@ package cudeventimpl
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -43,17 +44,20 @@ func CUDEventPackHandler(db *sql.DB) (packHandler stream.PackHandler) {
 		stmt := sqlRawEvent.stmt
 		switch stmt.(type) {
 		case *sqlparser.Insert:
-			sqlRawEvent.LastInsertId = cast.ToInt64(string(input))
+			sqlRawEvent.LastInsertId = string(input)
 		case *sqlparser.Update:
 			sqlRawEvent.RowsAffected = cast.ToInt64(string(input))
 		}
-		PublishSQLRawEventAsync(sqlRawEvent)
+		err = PublishSQLRawEvent(sqlRawEvent)
+		if err != nil {
+			return nil, err
+		}
 		return input, nil
 	})
 	return packHandler
 }
 
-var SoftDeleteColumn = "deletedAt" // 当update语句出现该列时，当成删除操作
+var SoftDeleteColumn = "deleted_at" // 当update语句出现该列时，当成删除操作
 
 type PrimaryKey struct {
 	Table  string `json:"table"`
@@ -131,7 +135,7 @@ type SQLRawEvent struct {
 	stmt         sqlparser.Statement
 	DB           *sql.DB
 	SQL          string `json:"sql"`
-	LastInsertId int64  `json:"lastInsertId"`
+	LastInsertId string `json:"lastInsertId"`
 	RowsAffected int64  `json:"affectedRows"`
 	BeforeData   string // update 更新前的数据
 }
@@ -170,9 +174,8 @@ func PublishSQLRawEvent(sqlRawEvent *SQLRawEvent) (err error) {
 	case *sqlparser.Delete:
 		return emitDeleteEvent(sqlRawEvent, stmt)
 	}
-
-	err = errors.New("not souport type")
-	return err
+	// 默认不发布事件
+	return nil
 
 }
 
@@ -214,8 +217,10 @@ func emitInsertEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Insert) (err erro
 	if err != nil {
 		return err
 	}
-	ids := []string{
-		cast.ToString(sqlRawEvent.LastInsertId),
+	var ids []string
+	err = json.Unmarshal([]byte(sqlRawEvent.LastInsertId), &ids)
+	if err != nil {
+		return err
 	}
 	selectSQL := getByIDsSQL(table, *primaryKey, ids)
 	ctx := context.Background()

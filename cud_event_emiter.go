@@ -114,9 +114,19 @@ func emitEvent(domain string, eventType string, before CUDEmiter, afterModels CU
 	if err != nil {
 		return err
 	}
-	err = publish(domain, changedPayload)
-	if err != nil {
-		return err
+	isPublish := false
+	for _, payload := range changedPayload.Payload {
+		if payload.Before != payload.After {
+			isPublish = true
+			break
+		}
 	}
+	if isPublish {
+		err = publish(domain, changedPayload)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

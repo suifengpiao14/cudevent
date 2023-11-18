@@ -79,10 +79,10 @@ github.com/suifengpiao14/funcs v0.0.16 h1:nuwXdfq3JzGit2QcrTOpN8a0f2hohxJiaiyxur
 github.com/suifengpiao14/funcs v0.0.16/go.mod h1:g95inzlUrS2Vtyvv5SjVFOnOeX7ZBPWwyKuEMMW+g7U=
 github.com/suifengpiao14/logchan/v2 v2.0.22 h1:LhpV9E0ofNRQFEvR9MOF4hSHJes8s/aXn9Z4qdLVPck=
 github.com/suifengpiao14/logchan/v2 v2.0.22/go.mod h1:6o0naTqWDkgYMR4vQetJn1zVGMLD9YZ8TrNzQ9OjAFY=
-github.com/suifengpiao14/sqlstream v0.0.1 h1:FV3TslNiLcxzY1l2ImxPZn7GMLFfEYjkZBm0ufiYR7k=
-github.com/suifengpiao14/sqlstream v0.0.1/go.mod h1:t8+zSQ6sgyqL8LWzWIqvUxcm799pXOqWmKbqOkHpWck=
-github.com/suifengpiao14/stream v0.0.15 h1:/Vx85oscjilWeNGqXrlvs6Gwkn8VjmLZ1BMc4S9nYrU=
-github.com/suifengpiao14/stream v0.0.15/go.mod h1:YC0sWm6M/Al2W/z/R1MgbU9WRMPG0lLNLgWpEbqb0/s=
+github.com/suifengpiao14/sqlstream v0.0.2 h1:3t9canQVizYGZsBMnGpXuTi8rLTLrc6H1mOL8FItzG0=
+github.com/suifengpiao14/sqlstream v0.0.2/go.mod h1:MYVPfnPfkHPvIjMQD2dquQBUAptfd4a3x7k7h5ZnnqI=
+github.com/suifengpiao14/stream v0.0.16 h1:NqwTvnZvJ3neu4zqStC/VBumFoyQicCwBP9e7GSe4ck=
+github.com/suifengpiao14/stream v0.0.16/go.mod h1:YC0sWm6M/Al2W/z/R1MgbU9WRMPG0lLNLgWpEbqb0/s=
 github.com/tidwall/gjson v1.17.0 h1:/Jocvlh98kcTfpN2+JzGQWQcqrPQwDrVEMApx/M5ZwM=
 github.com/tidwall/gjson v1.17.0/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
 github.com/tidwall/match v1.1.1 h1:+Ho715JplO36QYgwN9PGYNhgZvoUSc9X2c80KVTi+GA=
