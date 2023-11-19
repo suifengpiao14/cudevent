@@ -41,14 +41,22 @@ func newChangedPayload(domain string, eventType string, beforeEmiters CUDEmiter,
 	}
 	if len(beforeEmiters) == 0 && len(afterEmiters) > 0 {
 		for _, after := range afterEmiters {
-			payload := diffEmiter2Payload(after.GetIdentity(), nil, after.GetJsonData())
+			data, err := after.GetJsonData()
+			if err != nil {
+				return nil, err
+			}
+			payload := diffEmiter2Payload(after.GetIdentity(), nil, data)
 			changedMessage.Payload = append(changedMessage.Payload, payload)
 		}
 		return
 	}
 	if len(afterEmiters) == 0 && len(beforeEmiters) > 0 {
 		for _, before := range beforeEmiters {
-			payload := diffEmiter2Payload(before.GetIdentity(), nil, before.GetJsonData())
+			data, err := before.GetJsonData()
+			if err != nil {
+				return nil, err
+			}
+			payload := diffEmiter2Payload(before.GetIdentity(), nil, data)
 			changedMessage.Payload = append(changedMessage.Payload, payload)
 		}
 		return
@@ -81,13 +89,19 @@ func diffEmiter2Payload(id string, oldPatch []byte, newPatch []byte) (payload _P
 var ERROR_NO_DIFF_PATCH = errors.Errorf("no diff patch")
 
 type DiffI interface {
-	GetJsonData() (jsonData []byte)
+	GetJsonData() (jsonData []byte, err error)
 }
 
 // diff 比较2个结构体，提取前后有变化的内容(属性)
 func diff(befor DiffI, after DiffI) (old []byte, new []byte, err error) {
-	bforeByte := befor.GetJsonData()
-	afterByte := after.GetJsonData()
+	bforeByte, err := befor.GetJsonData()
+	if err != nil {
+		return nil, nil, err
+	}
+	afterByte, err := after.GetJsonData()
+	if err != nil {
+		return nil, nil, err
+	}
 	newPatch, err := jsonpatch.CreateMergePatch(bforeByte, afterByte)
 	if err != nil {
 		return nil, nil, err

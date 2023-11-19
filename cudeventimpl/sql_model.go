@@ -102,8 +102,8 @@ func (m SQLModel) GetIdentity() (id string) {
 func (m SQLModel) GetDomain() (domain string) {
 	return m.Table
 }
-func (m SQLModel) GetJsonData() (jsonData []byte) {
-	return m.data
+func (m SQLModel) GetJsonData() (jsonData []byte, err error) {
+	return m.data, nil
 }
 
 type SQLModels []SQLModel
