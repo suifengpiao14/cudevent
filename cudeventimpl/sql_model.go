@@ -79,7 +79,7 @@ var (
 func GetPrimaryKey(table string) (primaryKey *PrimaryKey, err error) {
 	v, ok := tablePrimaryKeyMap.Load(table)
 	if !ok {
-		err = errors.WithMessage(ERROR_NOT_FOUND_PRIMARY_KEY_BY_TABLE_NAME, table)
+		err = errors.WithMessagef(ERROR_NOT_FOUND_PRIMARY_KEY_BY_TABLE_NAME, "%s", table)
 		return nil, err
 	}
 	primaryKey, ok = v.(*PrimaryKey)

@@ -81,6 +81,8 @@ github.com/suifengpiao14/logchan/v2 v2.0.22 h1:LhpV9E0ofNRQFEvR9MOF4hSHJes8s/aXn
 github.com/suifengpiao14/logchan/v2 v2.0.22/go.mod h1:6o0naTqWDkgYMR4vQetJn1zVGMLD9YZ8TrNzQ9OjAFY=
 github.com/suifengpiao14/sqlstream v0.0.2 h1:3t9canQVizYGZsBMnGpXuTi8rLTLrc6H1mOL8FItzG0=
 github.com/suifengpiao14/sqlstream v0.0.2/go.mod h1:MYVPfnPfkHPvIjMQD2dquQBUAptfd4a3x7k7h5ZnnqI=
+github.com/suifengpiao14/sqlstream v0.0.4 h1:Nca38nOCCnU7/TDafbFyS+4iMqr6lo606N5prBcTzS4=
+github.com/suifengpiao14/sqlstream v0.0.4/go.mod h1:MYVPfnPfkHPvIjMQD2dquQBUAptfd4a3x7k7h5ZnnqI=
 github.com/suifengpiao14/stream v0.0.16 h1:NqwTvnZvJ3neu4zqStC/VBumFoyQicCwBP9e7GSe4ck=
 github.com/suifengpiao14/stream v0.0.16/go.mod h1:YC0sWm6M/Al2W/z/R1MgbU9WRMPG0lLNLgWpEbqb0/s=
 github.com/tidwall/gjson v1.17.0 h1:/Jocvlh98kcTfpN2+JzGQWQcqrPQwDrVEMApx/M5ZwM=
