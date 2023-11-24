@@ -241,10 +241,10 @@ func emitInsertEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Insert) (err erro
 }
 
 func emitUpdatedEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Update) (err error) {
-	/* 	selectSQL := ConvertUpdateToSelect(stmt)
-	   	err = sqlRawEvent.DBExecutorGetter().ExecOrQueryContext(context.Background(), selectSQL, &out)
-	*/
-	table := sqlparser.String(stmt.TableExprs[0])
+	if sqlRawEvent.BeforeData == "" { // 如果更新前记录为空，则说明依据更新的条件，找不到记录
+		return
+	}
+	table := sqlparser.String(stmt.TableExprs)
 	beforModels, err := byte2SQLModels(table, []byte(sqlRawEvent.BeforeData))
 	if err != nil {
 		return err
