@@ -92,7 +92,7 @@ func (ms SQLModels) GetPrimaryKey() (primaryKey *PrimaryKey) {
 }
 
 type SQLRawEvent struct {
-	stmt         sqlparser.Statement
+	Stmt         sqlparser.Statement
 	DB           *sql.DB
 	SQL          string `json:"sql"`
 	LastInsertId string `json:"lastInsertId"`
