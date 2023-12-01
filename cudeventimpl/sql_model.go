@@ -10,52 +10,12 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/spf13/cast"
 
 	"github.com/blastrain/vitess-sqlparser/sqlparser"
 	"github.com/suifengpiao14/cudevent"
-	"github.com/suifengpiao14/sqlstream"
-	"github.com/suifengpiao14/stream"
+	"github.com/suifengpiao14/sqlexec"
 	"github.com/tidwall/gjson"
 )
-
-func CUDEventPackHandler(db *sql.DB) (packHandler stream.PackHandler) {
-	sqlRawEvent := &SQLRawEvent{}
-	packHandler = stream.NewPackHandler(func(ctx context.Context, input []byte) (out []byte, err error) {
-		sql := string(input)
-		stmt, err := sqlparser.Parse(sql)
-		if err != nil {
-			return nil, err
-		}
-		sqlRawEvent.SQL = sql
-		sqlRawEvent.DB = db
-		sqlRawEvent.stmt = stmt
-		switch stmt := stmt.(type) {
-		case *sqlparser.Update: // 更新类型，先查询更新前数据，并保存
-			selectSQL := ConvertUpdateToSelect(stmt)
-			before, err := sqlstream.QueryContext(ctx, db, selectSQL)
-			if err != nil {
-				return nil, err
-			}
-			sqlRawEvent.BeforeData = before
-		}
-		return input, nil
-	}, func(ctx context.Context, input []byte) (out []byte, err error) {
-		stmt := sqlRawEvent.stmt
-		switch stmt.(type) {
-		case *sqlparser.Insert:
-			sqlRawEvent.LastInsertId = string(input)
-		case *sqlparser.Update:
-			sqlRawEvent.RowsAffected = cast.ToInt64(string(input))
-		}
-		err = PublishSQLRawEvent(sqlRawEvent)
-		if err != nil {
-			return nil, err
-		}
-		return input, nil
-	})
-	return packHandler
-}
 
 var SoftDeleteColumn = "deleted_at" // 当update语句出现该列时，当成删除操作
 
@@ -224,7 +184,7 @@ func emitInsertEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Insert) (err erro
 	}
 	selectSQL := getByIDsSQL(table, *primaryKey, ids)
 	ctx := context.Background()
-	data, err := sqlstream.QueryContext(ctx, sqlRawEvent.DB, selectSQL)
+	data, err := sqlexec.QueryContext(ctx, sqlRawEvent.DB, selectSQL)
 	if err != nil {
 		return err
 	}
@@ -254,7 +214,7 @@ func emitUpdatedEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Update) (err err
 	primaryKey := beforModels.GetPrimaryKey()
 	selectSQL := getByIDsSQL(table, *primaryKey, ids)
 	ctx := context.Background()
-	data, err := sqlstream.QueryContext(ctx, sqlRawEvent.DB, selectSQL)
+	data, err := sqlexec.QueryContext(ctx, sqlRawEvent.DB, selectSQL)
 	if err != nil {
 		return err
 	}
@@ -283,7 +243,7 @@ func emitDeleteEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Delete) (err erro
 	}
 	selectSQL := getByIDsSQL(table, *primaryKey, ids)
 	ctx := context.Background()
-	data, err := sqlstream.QueryContext(ctx, sqlRawEvent.DB, selectSQL)
+	data, err := sqlexec.QueryContext(ctx, sqlRawEvent.DB, selectSQL)
 	if err != nil {
 		return err
 	}
