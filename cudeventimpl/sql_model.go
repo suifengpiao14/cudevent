@@ -322,43 +322,6 @@ const (
 	SQL_TYPE_DELETE = "delete"
 )
 
-func ConvertInsertToSelect(stmt *sqlparser.Insert, primaryKey string, primaryKeyValue string) (selectSQL string) {
-	// 获取 INSERT 语句的字段列表
-	var selectFields []string
-	for _, col := range stmt.Columns {
-		selectFields = append(selectFields, sqlparser.String(col))
-	}
-	// 获取 INSERT 语句的表名
-	tableName := sqlparser.String(stmt.Table)
-	selectField := strings.Join(selectFields, ", ")
-	where := fmt.Sprintf("`%s`=%s", primaryKey, primaryKeyValue)
-	selectSQL = fmt.Sprintf("SELECT %s FROM %s WHERE %s", selectField, tableName, where)
-	return selectSQL
-}
-
-func ConvertUpdateToSelect(stmt *sqlparser.Update) (selectSQL string) {
-	// 将 UPDATE 语句中的 SET 子句转换为 SELECT 语句的字段列表
-	// var selectFields []string
-	// 缺少id
-	// for _, expr := range stmt.Exprs {
-	// 	selectFields = append(selectFields, sqlparser.String(expr.Name))
-	// }
-	tableName := sqlparser.String(stmt.TableExprs)
-	//selectField := strings.Join(selectFields, ", ") //缺少Id，暂时用*代替
-	where := sqlparser.String(stmt.Where)
-	selectSQL = fmt.Sprintf("SELECT * FROM %s  %s", tableName, where)
-	return selectSQL
-}
-
-func ConvertDeleteToSelect(stmt *sqlparser.Delete) (selectSQL string) {
-	// 获取 DELETE 语句的表名
-	selectField := "*"
-	tableName := sqlparser.String(stmt.TableExprs)
-	where := sqlparser.String(stmt.Where)
-	selectSQL = fmt.Sprintf("SELECT %s FROM %s WHERE %s", selectField, tableName, where)
-	return selectSQL
-}
-
 func RegisterTablePrimaryKeyByDB(db *sql.DB, dbName string) (err error) {
 	sql := fmt.Sprintf("SELECT  table_name `table`,column_name `column`,data_type `type` FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '%s' AND COLUMN_KEY = 'PRI'", dbName)
 	primaryKeys := make([]PrimaryKey, 0)
