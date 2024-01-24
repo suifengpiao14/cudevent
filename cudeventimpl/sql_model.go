@@ -349,7 +349,7 @@ type FiledPath struct {
 func (fp FiledPath) SqlFullname() (sqlFullname string) {
 	sqlFullname = fmt.Sprintf("`%s`.`%s`", fp.Table, fp.Field)
 	if fp.DB != "" {
-		sqlFullname = fmt.Sprintf("`%s`.")
+		sqlFullname = fmt.Sprintf("`%s`.", fp.DB)
 	}
 	return sqlFullname
 }
