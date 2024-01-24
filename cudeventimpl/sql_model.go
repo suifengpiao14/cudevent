@@ -92,12 +92,12 @@ func (ms SQLModels) GetPrimaryKey() (primaryKey *PrimaryKey) {
 }
 
 type SQLRawEvent struct {
-	Stmt         sqlparser.Statement
-	DB           *sql.DB
-	SQL          string `json:"sql"`
-	LastInsertId string `json:"lastInsertId"`
-	RowsAffected int64  `json:"affectedRows"`
-	BeforeData   string // update 更新前的数据
+	Stmt         sqlparser.Statement `json:"-"`
+	DB           *sql.DB             `json:"-"`
+	SQL          string              `json:"sql"`
+	LastInsertId string              `json:"lastInsertId"`
+	RowsAffected int64               `json:"affectedRows"`
+	BeforeData   string              `json:"-"` // update 更新前的数据,这个只是内部使用，不用于事件中
 }
 
 func PublishSQLRawEvent(sqlRawEvent *SQLRawEvent) (err error) {
@@ -316,11 +316,11 @@ func getByIDsSQL(table string, primaryKey PrimaryKey, ids []string) (sql string)
 	return sql
 }
 
-const (
-	SQL_TYPE_UPDATE = "update"
-	SQL_TYPE_INSERT = "insert"
-	SQL_TYPE_DELETE = "delete"
-)
+// const (
+// 	SQL_TYPE_UPDATE = "update"
+// 	SQL_TYPE_INSERT = "insert"
+// 	SQL_TYPE_DELETE = "delete"
+// )
 
 func RegisterTablePrimaryKeyByDB(db *sql.DB, dbName string) (err error) {
 	sql := fmt.Sprintf("SELECT  table_name `table`,column_name `column`,data_type `type` FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '%s' AND COLUMN_KEY = 'PRI'", dbName)
@@ -337,4 +337,52 @@ func RegisterTablePrimaryKeyByDB(db *sql.DB, dbName string) (err error) {
 		RegisterTablePrimaryKey(primaryKey.Table, primaryKey)
 	}
 	return nil
+}
+
+//FiledPath 数据同步中 映射关系 的字段路径
+type FiledPath struct {
+	DB    string `json:"db"`
+	Table string `json:"table"`
+	Field string `json:"field"`
+}
+
+func (fp FiledPath) SqlFullname() (sqlFullname string) {
+	sqlFullname = fmt.Sprintf("`%s`.`%s`", fp.Table, fp.Field)
+	if fp.DB != "" {
+		sqlFullname = fmt.Sprintf("`%s`.")
+	}
+	return sqlFullname
+}
+
+func SyncData(srcFiledPathStr string, dstFiledPathStr string, joinOn string, where string) (err error) {
+	srcFiledPath, err := ParseFilePath(srcFiledPathStr)
+	if err != nil {
+		return err
+	}
+	dstFiledPath, err := ParseFilePath(dstFiledPathStr)
+	if err != nil {
+		return err
+	}
+
+	selectSql := fmt.Sprintf("select %s from  %s,%s where %s and %s limit 1", srcFiledPath.SqlFullname(), dstFiledPath.Table, srcFiledPath.Table, joinOn, where)
+	_ = selectSql
+	return nil
+}
+
+func ParseFilePath(dbTableField string) (filedPath *FiledPath, err error) {
+	filedPath = &FiledPath{}
+	dbTableField = strings.ReplaceAll(dbTableField, "`", "")
+	arr := strings.Split(dbTableField, ".")
+	l := len(arr)
+	if l != 2 && l != 3 {
+		err = errors.Errorf("dbTableFiled want [db.]table.filed struct ,got:%s", dbTableField)
+		return nil, err
+	}
+	if l == 3 {
+		filedPath.DB = arr[0]
+		arr = arr[1:]
+	}
+	filedPath.Table = arr[0]
+	filedPath.Field = arr[1]
+	return filedPath, nil
 }

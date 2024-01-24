@@ -115,7 +115,7 @@ func emitEvent(domain string, eventType string, before CUDEmiter, afterModels CU
 		return err
 	}
 	isPublish := false
-	for _, payload := range changedPayload.Payload {
+	for _, payload := range changedPayload.Payloads {
 		if payload.Before != payload.After {
 			isPublish = true
 			break
