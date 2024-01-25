@@ -19,15 +19,9 @@ import (
 
 var SoftDeleteColumn = "deleted_at" // 当update语句出现该列时，当成删除操作
 
-type PrimaryKey struct {
-	Table  string `json:"table"`
-	Column string `json:"column"`
-	Type   string `json:"type"`
-}
-
 var tablePrimaryKeyMap sync.Map
 
-func RegisterTablePrimaryKey(table string, primaryKey PrimaryKey) {
+func RegisterTablePrimaryKey(table string, primaryKey BaseField) {
 	tablePrimaryKeyMap.Store(table, &primaryKey)
 }
 
@@ -36,13 +30,13 @@ var (
 	ERROR_INVALID_TYPE                        = errors.New("invalid type")
 )
 
-func GetPrimaryKey(table string) (primaryKey *PrimaryKey, err error) {
+func GetPrimaryKey(table string) (primaryKey *BaseField, err error) {
 	v, ok := tablePrimaryKeyMap.Load(table)
 	if !ok {
 		err = errors.WithMessagef(ERROR_NOT_FOUND_PRIMARY_KEY_BY_TABLE_NAME, "%s", table)
 		return nil, err
 	}
-	primaryKey, ok = v.(*PrimaryKey)
+	primaryKey, ok = v.(*BaseField)
 	if !ok {
 		return nil, ERROR_INVALID_TYPE
 	}
@@ -50,13 +44,13 @@ func GetPrimaryKey(table string) (primaryKey *PrimaryKey, err error) {
 }
 
 type SQLModel struct {
-	PrimaryKey PrimaryKey
+	PrimaryKey BaseField
 	Table      string
 	data       []byte
 }
 
 func (m SQLModel) GetIdentity() (id string) {
-	return gjson.GetBytes(m.data, m.PrimaryKey.Column).String()
+	return gjson.GetBytes(m.data, m.PrimaryKey.Name).String()
 }
 
 func (m SQLModel) GetDomain() (domain string) {
@@ -84,7 +78,7 @@ func (ms SQLModels) GetIdentities() (identities []string) {
 	return identities
 }
 
-func (ms SQLModels) GetPrimaryKey() (primaryKey *PrimaryKey) {
+func (ms SQLModels) GetPrimaryKey() (primaryKey *BaseField) {
 	for _, m := range ms {
 		return &m.PrimaryKey
 	}
@@ -236,7 +230,7 @@ func emitDeleteEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Delete) (err erro
 		return err
 	}
 
-	exp := getIdentityFromWhere(stmt.Where.Expr, primaryKey.Column)
+	exp := getIdentityFromWhere(stmt.Where.Expr, primaryKey.Name)
 
 	ids := []string{
 		sqlparser.String(exp), // 此处需要再处理，delete 目前使用不到，暂时不写，仅提供思路
@@ -300,7 +294,7 @@ const (
 	PrimaryKey_Type_Int = "int"
 )
 
-func getByIDsSQL(table string, primaryKey PrimaryKey, ids []string) (sql string) {
+func getByIDsSQL(table string, primaryKey BaseField, ids []string) (sql string) {
 	idstr := ""
 	switch strings.ToLower(primaryKey.Type) {
 	case PrimaryKey_Type_Int:
@@ -309,22 +303,16 @@ func getByIDsSQL(table string, primaryKey PrimaryKey, ids []string) (sql string)
 		idstr = fmt.Sprintf("'%s'", strings.Join(ids, `','`))
 	}
 	if strings.Contains(idstr, ",") {
-		sql = fmt.Sprintf("select * from `%s` where `%s` in (%s);", table, primaryKey.Column, idstr)
+		sql = fmt.Sprintf("select * from `%s` where `%s` in (%s);", table, primaryKey.Name, idstr)
 	} else {
-		sql = fmt.Sprintf("select * from `%s` where `%s`=%s;", table, primaryKey.Column, idstr)
+		sql = fmt.Sprintf("select * from `%s` where `%s`=%s;", table, primaryKey.Name, idstr)
 	}
 	return sql
 }
 
-// const (
-// 	SQL_TYPE_UPDATE = "update"
-// 	SQL_TYPE_INSERT = "insert"
-// 	SQL_TYPE_DELETE = "delete"
-// )
-
 func RegisterTablePrimaryKeyByDB(db *sql.DB, dbName string) (err error) {
 	sql := fmt.Sprintf("SELECT  table_name `table`,column_name `column`,data_type `type` FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '%s' AND COLUMN_KEY = 'PRI'", dbName)
-	primaryKeys := make([]PrimaryKey, 0)
+	primaryKeys := make([]BaseField, 0)
 	rows, err := db.QueryContext(context.Background(), sql)
 	if err != nil {
 		return err
@@ -337,52 +325,4 @@ func RegisterTablePrimaryKeyByDB(db *sql.DB, dbName string) (err error) {
 		RegisterTablePrimaryKey(primaryKey.Table, primaryKey)
 	}
 	return nil
-}
-
-//FiledPath 数据同步中 映射关系 的字段路径
-type FiledPath struct {
-	DB    string `json:"db"`
-	Table string `json:"table"`
-	Field string `json:"field"`
-}
-
-func (fp FiledPath) SqlFullname() (sqlFullname string) {
-	sqlFullname = fmt.Sprintf("`%s`.`%s`", fp.Table, fp.Field)
-	if fp.DB != "" {
-		sqlFullname = fmt.Sprintf("`%s`.", fp.DB)
-	}
-	return sqlFullname
-}
-
-func SyncData(srcFiledPathStr string, dstFiledPathStr string, joinOn string, where string) (err error) {
-	srcFiledPath, err := ParseFilePath(srcFiledPathStr)
-	if err != nil {
-		return err
-	}
-	dstFiledPath, err := ParseFilePath(dstFiledPathStr)
-	if err != nil {
-		return err
-	}
-
-	selectSql := fmt.Sprintf("select %s from  %s,%s where %s and %s limit 1", srcFiledPath.SqlFullname(), dstFiledPath.Table, srcFiledPath.Table, joinOn, where)
-	_ = selectSql
-	return nil
-}
-
-func ParseFilePath(dbTableField string) (filedPath *FiledPath, err error) {
-	filedPath = &FiledPath{}
-	dbTableField = strings.ReplaceAll(dbTableField, "`", "")
-	arr := strings.Split(dbTableField, ".")
-	l := len(arr)
-	if l != 2 && l != 3 {
-		err = errors.Errorf("dbTableFiled want [db.]table.filed struct ,got:%s", dbTableField)
-		return nil, err
-	}
-	if l == 3 {
-		filedPath.DB = arr[0]
-		arr = arr[1:]
-	}
-	filedPath.Table = arr[0]
-	filedPath.Field = arr[1]
-	return filedPath, nil
 }
