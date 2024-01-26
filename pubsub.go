@@ -10,6 +10,7 @@ import (
 )
 
 var DEBUG = false
+var topic = "cudevent_channel"
 
 // pubSub 事件发布器，使用最简单的go channel发布订阅作为解耦业务和通信，如需发布到其它消息队列可专注从go channel中获取消息转发，无需耦合业务
 // pubSub 固定不可变的go channel
@@ -20,8 +21,7 @@ var pubSub = gochannel.NewGoChannel(
 )
 
 // publish 发布消息
-func publish(domain string, payload *_ChangedMessage) (err error) {
-	topic := makeTopic(domain)
+func publish(payload *_ChangedMessage) (err error) {
 	b, err := json.Marshal(payload)
 	if err != nil {
 		return err
@@ -35,8 +35,7 @@ func publish(domain string, payload *_ChangedMessage) (err error) {
 }
 
 // Subscriber 增加订阅者
-func Subscriber(ctx context.Context, domain string, fn func(msg *message.Message) (err error)) (err error) {
-	topic := makeTopic(domain)
+func Subscriber(ctx context.Context, fn func(msg *message.Message) (err error)) (err error) {
 	messageChan, err := pubSub.Subscribe(context.Background(), topic)
 	if err != nil {
 		return err

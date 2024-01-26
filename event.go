@@ -11,7 +11,7 @@ import (
 
 // 变化前后的负载
 type _ChangedMessage struct {
-	Domain    string     `json:"domain"`
+	Table     string     `json:"table"`
 	EventType string     `json:"eventType"`
 	Payloads  []_Payload `json:"payload"`
 }
@@ -43,12 +43,8 @@ func (changedPayload *_ChangedMessage) umarshMessage(msg *message.Message) (err 
 	return err
 }
 
-func newChangedPayload(domain string, eventType string, beforeEmiters CUDEmiter, afterEmiters CUDEmiter) (changedMessage *_ChangedMessage, err error) {
-	changedMessage = &_ChangedMessage{
-		Domain:    domain,
-		EventType: eventType,
-		Payloads:  make([]_Payload, 0),
-	}
+func newChangedPayload(beforeEmiters CUDEmiter, afterEmiters CUDEmiter) (payloads []_Payload, err error) {
+	payloads = make([]_Payload, 0)
 	if len(beforeEmiters) == 0 && len(afterEmiters) > 0 {
 		for _, after := range afterEmiters {
 			data, err := after.GetJsonData()
@@ -56,7 +52,7 @@ func newChangedPayload(domain string, eventType string, beforeEmiters CUDEmiter,
 				return nil, err
 			}
 			payload := diffEmiter2Payload(after.GetIdentity(), nil, data)
-			changedMessage.Payloads = append(changedMessage.Payloads, payload)
+			payloads = append(payloads, payload)
 		}
 		return
 	}
@@ -67,7 +63,7 @@ func newChangedPayload(domain string, eventType string, beforeEmiters CUDEmiter,
 				return nil, err
 			}
 			payload := diffEmiter2Payload(before.GetIdentity(), nil, data)
-			changedMessage.Payloads = append(changedMessage.Payloads, payload)
+			payloads = append(payloads, payload)
 		}
 		return
 	}
@@ -81,9 +77,9 @@ func newChangedPayload(domain string, eventType string, beforeEmiters CUDEmiter,
 			}
 		}
 		payload := diffEmiter2Payload(befor.GetIdentity(), oldPatch, newPatch)
-		changedMessage.Payloads = append(changedMessage.Payloads, payload)
+		payloads = append(payloads, payload)
 	}
-	return changedMessage, nil
+	return payloads, nil
 }
 
 func diffEmiter2Payload(id string, oldPatch []byte, newPatch []byte) (payload _Payload) {

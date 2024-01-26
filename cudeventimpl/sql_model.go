@@ -50,7 +50,7 @@ type SQLModel struct {
 }
 
 func (m SQLModel) GetIdentity() (id string) {
-	return gjson.GetBytes(m.data, m.PrimaryKey.Name).String()
+	return gjson.GetBytes(m.data, m.PrimaryKey.Column).String()
 }
 
 func (m SQLModel) GetDomain() (domain string) {
@@ -230,7 +230,7 @@ func emitDeleteEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Delete) (err erro
 		return err
 	}
 
-	exp := getIdentityFromWhere(stmt.Where.Expr, primaryKey.Name)
+	exp := getIdentityFromWhere(stmt.Where.Expr, primaryKey.Column)
 
 	ids := []string{
 		sqlparser.String(exp), // 此处需要再处理，delete 目前使用不到，暂时不写，仅提供思路
@@ -303,9 +303,9 @@ func getByIDsSQL(table string, primaryKey BaseField, ids []string) (sql string) 
 		idstr = fmt.Sprintf("'%s'", strings.Join(ids, `','`))
 	}
 	if strings.Contains(idstr, ",") {
-		sql = fmt.Sprintf("select * from `%s` where `%s` in (%s);", table, primaryKey.Name, idstr)
+		sql = fmt.Sprintf("select * from `%s` where `%s` in (%s);", table, primaryKey.Column, idstr)
 	} else {
-		sql = fmt.Sprintf("select * from `%s` where `%s`=%s;", table, primaryKey.Name, idstr)
+		sql = fmt.Sprintf("select * from `%s` where `%s`=%s;", table, primaryKey.Column, idstr)
 	}
 	return sql
 }
@@ -322,6 +322,7 @@ func RegisterTablePrimaryKeyByDB(db *sql.DB, dbName string) (err error) {
 		return err
 	}
 	for _, primaryKey := range primaryKeys {
+		primaryKey.PrimaryKey = true
 		RegisterTablePrimaryKey(primaryKey.Table, primaryKey)
 	}
 	return nil

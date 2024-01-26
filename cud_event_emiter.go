@@ -1,17 +1,10 @@
 package cudevent
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 )
 
 var TOPIC_FORMAT = "cud.%s"
-
-func makeTopic(domain string) (topic string) {
-	topic = fmt.Sprintf(TOPIC_FORMAT, domain)
-	return topic
-}
 
 // 增改删 操作广播领域事件
 type CUDEmiterI interface {
@@ -71,7 +64,7 @@ func EmitUpdatedEvent(beforeModels CUDEmiter, afterModels CUDEmiter) (err error)
 	for _, afterModel := range afterModels {
 		afterModelMap[afterModel.GetIdentity()] = afterModel
 	}
-	domainCheckMap := make(map[string]CUDEmiterI)
+	tableCheckMap := make(map[string]CUDEmiterI)
 	for _, beforeModel := range beforeModels {
 		afterModel, ok := afterModelMap[beforeModel.GetIdentity()]
 		if !ok {
@@ -79,18 +72,18 @@ func EmitUpdatedEvent(beforeModels CUDEmiter, afterModels CUDEmiter) (err error)
 			return err
 		}
 		if afterModel.GetDomain() != beforeModel.GetDomain() {
-			err = errors.WithMessagef(ERROR_UPDATE_MODEL_DOMAIN_NOT_SAME_BEFORE_AFTER, "model:%s befor domain is:%s,after domain is:%s", beforeModel.GetIdentity(), beforeModel.GetDomain(), afterModel.GetDomain())
+			err = errors.WithMessagef(ERROR_UPDATE_MODEL_DOMAIN_NOT_SAME_BEFORE_AFTER, "model:%s befor table is:%s,after table is:%s", beforeModel.GetIdentity(), beforeModel.GetDomain(), afterModel.GetDomain())
 			return err
 		}
-		if len(domainCheckMap) == 0 {
-			domainCheckMap[beforeModel.GetDomain()] = beforeModel
+		if len(tableCheckMap) == 0 {
+			tableCheckMap[beforeModel.GetDomain()] = beforeModel
 		} else {
-			if _, ok := domainCheckMap[beforeModel.GetDomain()]; !ok {
+			if _, ok := tableCheckMap[beforeModel.GetDomain()]; !ok {
 				var existsModel CUDEmiterI
-				for _, existsModel = range domainCheckMap {
+				for _, existsModel = range tableCheckMap {
 					break
 				}
-				err = errors.WithMessagef(ERROR_UPDATE_MODEL_DOMAIN_INCONSISTENT, "model:%s's domain is:%s ,bud model:%s's domain is:%s", existsModel.GetIdentity(), existsModel.GetDomain(), beforeModel.GetIdentity(), afterModel.GetDomain())
+				err = errors.WithMessagef(ERROR_UPDATE_MODEL_DOMAIN_INCONSISTENT, "model:%s's table is:%s ,bud model:%s's table is:%s", existsModel.GetIdentity(), existsModel.GetDomain(), beforeModel.GetIdentity(), afterModel.GetDomain())
 				return err
 			}
 		}
@@ -109,11 +102,17 @@ func EmitDeletedEvent(beforeModels CUDEmiter) (err error) {
 	return emitEvent(beforeModel.GetDomain(), EVENT_TYPE_DELETED, beforeModels, nil)
 }
 
-func emitEvent(domain string, eventType string, before CUDEmiter, afterModels CUDEmiter) (err error) {
-	changedPayload, err := newChangedPayload(domain, eventType, before, afterModels)
+func emitEvent(table string, eventType string, before CUDEmiter, afterModels CUDEmiter) (err error) {
+	payloads, err := newChangedPayload(before, afterModels)
 	if err != nil {
 		return err
 	}
+	changedPayload := &_ChangedMessage{
+		Table:     table,
+		EventType: eventType,
+		Payloads:  payloads,
+	}
+	// 过滤掉关注的数据没有发生实际变化的场景
 	isPublish := false
 	for _, payload := range changedPayload.Payloads {
 		if payload.Before != payload.After {
@@ -122,7 +121,7 @@ func emitEvent(domain string, eventType string, before CUDEmiter, afterModels CU
 		}
 	}
 	if isPublish {
-		err = publish(domain, changedPayload)
+		err = publish(changedPayload)
 		if err != nil {
 			return err
 		}

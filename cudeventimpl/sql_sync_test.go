@@ -2,6 +2,7 @@ package cudeventimpl_test
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,16 +12,26 @@ import (
 
 func Init() {
 	cudeventimpl.RegisterTablePrimaryKey("user", cudeventimpl.BaseField{
-		DB:         "test",
 		Table:      "user",
-		Name:       "id",
+		Column:     "id",
 		Type:       "int",
 		PrimaryKey: true,
 	})
 	cudeventimpl.RegisterTablePrimaryKey("department", cudeventimpl.BaseField{
-		DB:         "test",
 		Table:      "department",
-		Name:       "id",
+		Column:     "id",
+		Type:       "int",
+		PrimaryKey: true,
+	})
+	cudeventimpl.RegisterTablePrimaryKey("export_task", cudeventimpl.BaseField{
+		Table:      "export_task",
+		Column:     "id",
+		Type:       "int",
+		PrimaryKey: true,
+	})
+	cudeventimpl.RegisterTablePrimaryKey("export_template", cudeventimpl.BaseField{
+		Table:      "export_template",
+		Column:     "id",
 		Type:       "int",
 		PrimaryKey: true,
 	})
@@ -33,7 +44,7 @@ func TestSyncUpdateNamedSQL(t *testing.T) {
 		relation2 := "department.user_id=user.id"
 		fieldRelations, err := cudeventimpl.ParseFieldRelation(relation, relation2)
 		require.NoError(t, err)
-		syncUpdateNamedSql, err := fieldRelations.SyncUpdateNamedSQL()
+		syncUpdateNamedSql, err := fieldRelations.SyncRedundantFieldByDstPrimaryKey()
 		require.NoError(t, err)
 		expected := "update user,department set `department`.`user_name`=`user`.`name`,`department`.`user_nickname`=`user`.`nick_name` where  1=1 and `department`.`user_id`=`user`.`id` and `department`.`id`=:ID limit 1"
 		assert.Equal(t, syncUpdateNamedSql, expected)
@@ -43,7 +54,7 @@ func TestSyncUpdateNamedSQL(t *testing.T) {
 		relation2 := "department.user_id=user.id"
 		fieldRelations, err := cudeventimpl.ParseFieldRelation(relation, relation2)
 		require.NoError(t, err)
-		_, err = fieldRelations.SyncUpdateNamedSQL()
+		_, err = fieldRelations.SyncRedundantFieldByDstPrimaryKey()
 		assert.Equal(t, true, errors.Is(err, cudeventimpl.ERROR_NO_UPDATE_FIELD))
 	})
 
@@ -52,8 +63,36 @@ func TestSyncUpdateNamedSQL(t *testing.T) {
 		relation2 := ""
 		fieldRelations, err := cudeventimpl.ParseFieldRelation(relation, relation2)
 		require.NoError(t, err)
-		_, err = fieldRelations.SyncUpdateNamedSQL()
-		assert.Equal(t, true, errors.Is(err, cudeventimpl.ERROR_NO_PRIMARY_RELATION_FIELD))
+		_, err = fieldRelations.SyncRedundantFieldByDstPrimaryKey()
+		assert.Equal(t, true, errors.Is(err, cudeventimpl.ERROR_PRIMARY_RELATION_FIELD_LESS_THEN_SRC_TABLE_COUNT))
 	})
 
+}
+
+func TestParseRelation(t *testing.T) {
+	Init()
+	relationStr := `
+	export_task.title=export_template.title,
+	export_task.timeout=export_template.max_exec_time,
+	export_task.template_id=export_template.id,
+	`
+	relation, err := cudeventimpl.ParseFieldRelation(relationStr)
+	require.NoError(t, err)
+	fmt.Println(relation)
+}
+
+func TestSyncRedundantFieldBySrcPrimaryKey(t *testing.T) {
+	Init()
+	relationStr := `
+	export_task.timeout=export_template.max_exec_time,
+	export_task.template_id=export_template.id,
+	`
+	relation, err := cudeventimpl.ParseFieldRelation(relationStr)
+	require.NoError(t, err)
+	relation.SetScene(cudeventimpl.Relation_Scene_Src_Update)
+	namedSqls, err := relation.SyncRedundantFieldBySrcPrimaryKey()
+	require.NoError(t, err)
+	for _, namedSql := range namedSqls {
+		fmt.Println(namedSql)
+	}
 }
