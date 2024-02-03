@@ -19,18 +19,12 @@ import (
 
 var SoftDeleteColumn = "deleted_at" // 当update语句出现该列时，当成删除操作
 
-type PrimaryKey struct {
-	Table  string `json:"table"`
-	Column string `json:"column"`
-	Type   string `json:"type"`
-}
-
 var tablePrimaryKeyMap sync.Map
 
 func getTablePrimaryKeyMapKey(database string, table string) (key string) {
 	return fmt.Sprintf("%s_%s", database, table)
 }
-func RegisterTablePrimaryKey(database string, table string, primaryKey PrimaryKey) {
+func RegisterTablePrimaryKey(database string, table string, primaryKey BaseField) {
 	key := getTablePrimaryKeyMapKey(database, table)
 	tablePrimaryKeyMap.Store(key, &primaryKey)
 }
@@ -40,14 +34,14 @@ var (
 	ERROR_INVALID_TYPE                        = errors.New("invalid type")
 )
 
-func GetPrimaryKey(database string, table string) (primaryKey *PrimaryKey, err error) {
+func GetPrimaryKey(database string, table string) (primaryKey *BaseField, err error) {
 	key := getTablePrimaryKeyMapKey(database, table)
 	v, ok := tablePrimaryKeyMap.Load(key)
 	if !ok {
 		err = errors.WithMessagef(ERROR_NOT_FOUND_PRIMARY_KEY_BY_TABLE_NAME, "%s", key)
 		return nil, err
 	}
-	primaryKey, ok = v.(*PrimaryKey)
+	primaryKey, ok = v.(*BaseField)
 	if !ok {
 		return nil, ERROR_INVALID_TYPE
 	}
@@ -55,7 +49,7 @@ func GetPrimaryKey(database string, table string) (primaryKey *PrimaryKey, err e
 }
 
 type SQLModel struct {
-	PrimaryKey PrimaryKey
+	PrimaryKey BaseField
 	Table      string
 	data       []byte
 }
@@ -89,7 +83,7 @@ func (ms SQLModels) GetIdentities() (identities []string) {
 	return identities
 }
 
-func (ms SQLModels) GetPrimaryKey() (primaryKey *PrimaryKey) {
+func (ms SQLModels) GetPrimaryKey() (primaryKey *BaseField) {
 	for _, m := range ms {
 		return &m.PrimaryKey
 	}
@@ -97,13 +91,13 @@ func (ms SQLModels) GetPrimaryKey() (primaryKey *PrimaryKey) {
 }
 
 type SQLRawEvent struct {
-	Stmt         sqlparser.Statement
-	DB           *sql.DB
-	Database     string `json:"database"` //这个用来获取ddl相关数据,以及依赖ddl 生成的table内容
-	SQL          string `json:"sql"`
-	LastInsertId string `json:"lastInsertId"`
-	RowsAffected int64  `json:"affectedRows"`
-	BeforeData   string // update 更新前的数据
+	Stmt         sqlparser.Statement `json:"-"`
+	DB           *sql.DB             `json:"-"`
+	Database     string              `json:"database"` //这个用来获取ddl相关数据,以及依赖ddl 生成的table内容
+	SQL          string              `json:"sql"`
+	LastInsertId string              `json:"lastInsertId"`
+	RowsAffected int64               `json:"affectedRows"`
+	BeforeData   string              `json:"-"` // update 更新前的数据
 }
 
 func PublishSQLRawEvent(sqlRawEvent *SQLRawEvent) (err error) {
@@ -311,7 +305,7 @@ const (
 	PrimaryKey_Type_Int = "int"
 )
 
-func getByIDsSQL(table string, primaryKey PrimaryKey, ids []string) (sql string) {
+func getByIDsSQL(table string, primaryKey BaseField, ids []string) (sql string) {
 	idstr := ""
 	switch strings.ToLower(primaryKey.Type) {
 	case PrimaryKey_Type_Int:
@@ -327,15 +321,9 @@ func getByIDsSQL(table string, primaryKey PrimaryKey, ids []string) (sql string)
 	return sql
 }
 
-const (
-	SQL_TYPE_UPDATE = "update"
-	SQL_TYPE_INSERT = "insert"
-	SQL_TYPE_DELETE = "delete"
-)
-
 func RegisterTablePrimaryKeyByDB(db *sql.DB, dbName string) (err error) {
 	sql := fmt.Sprintf("SELECT  table_name `table`,column_name `column`,data_type `type` FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '%s' AND COLUMN_KEY = 'PRI'", dbName)
-	primaryKeys := make([]PrimaryKey, 0)
+	primaryKeys := make([]BaseField, 0)
 	rows, err := db.QueryContext(context.Background(), sql)
 	if err != nil {
 		return err
@@ -345,6 +333,7 @@ func RegisterTablePrimaryKeyByDB(db *sql.DB, dbName string) (err error) {
 		return err
 	}
 	for _, primaryKey := range primaryKeys {
+		primaryKey.PrimaryKey = true
 		RegisterTablePrimaryKey(dbName, primaryKey.Table, primaryKey)
 	}
 	return nil
