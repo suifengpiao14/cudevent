@@ -27,8 +27,12 @@ type PrimaryKey struct {
 
 var tablePrimaryKeyMap sync.Map
 
-func RegisterTablePrimaryKey(table string, primaryKey PrimaryKey) {
-	tablePrimaryKeyMap.Store(table, &primaryKey)
+func getTablePrimaryKeyMapKey(database string, table string) (key string) {
+	return fmt.Sprintf("%s_%s", database, table)
+}
+func RegisterTablePrimaryKey(database string, table string, primaryKey PrimaryKey) {
+	key := getTablePrimaryKeyMapKey(database, table)
+	tablePrimaryKeyMap.Store(key, &primaryKey)
 }
 
 var (
@@ -36,10 +40,11 @@ var (
 	ERROR_INVALID_TYPE                        = errors.New("invalid type")
 )
 
-func GetPrimaryKey(table string) (primaryKey *PrimaryKey, err error) {
-	v, ok := tablePrimaryKeyMap.Load(table)
+func GetPrimaryKey(database string, table string) (primaryKey *PrimaryKey, err error) {
+	key := getTablePrimaryKeyMapKey(database, table)
+	v, ok := tablePrimaryKeyMap.Load(key)
 	if !ok {
-		err = errors.WithMessagef(ERROR_NOT_FOUND_PRIMARY_KEY_BY_TABLE_NAME, "%s", table)
+		err = errors.WithMessagef(ERROR_NOT_FOUND_PRIMARY_KEY_BY_TABLE_NAME, "%s", key)
 		return nil, err
 	}
 	primaryKey, ok = v.(*PrimaryKey)
@@ -94,6 +99,7 @@ func (ms SQLModels) GetPrimaryKey() (primaryKey *PrimaryKey) {
 type SQLRawEvent struct {
 	Stmt         sqlparser.Statement
 	DB           *sql.DB
+	Database     string `json:"database"` //这个用来获取ddl相关数据,以及依赖ddl 生成的table内容
 	SQL          string `json:"sql"`
 	LastInsertId string `json:"lastInsertId"`
 	RowsAffected int64  `json:"affectedRows"`
@@ -107,6 +113,11 @@ func PublishSQLRawEvent(sqlRawEvent *SQLRawEvent) (err error) {
 	}
 	if sqlRawEvent.DB == nil {
 		err = errors.New("DB required")
+		return err
+	}
+
+	if sqlRawEvent.Database == "" {
+		err = errors.New("Database required")
 		return err
 	}
 	stmt, err := sqlparser.Parse(sqlRawEvent.SQL)
@@ -173,7 +184,7 @@ func getIdentityFromWhere(whereExpr sqlparser.Expr, identityKey string) (expr sq
 
 func emitInsertEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Insert) (err error) {
 	table := sqlparser.String(stmt.Table)
-	primaryKey, err := GetPrimaryKey(table)
+	primaryKey, err := GetPrimaryKey(sqlRawEvent.Database, table)
 	if err != nil {
 		return err
 	}
@@ -188,7 +199,7 @@ func emitInsertEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Insert) (err erro
 	if err != nil {
 		return err
 	}
-	afterModels, err := byte2SQLModels(table, []byte(data))
+	afterModels, err := byte2SQLModels(sqlRawEvent.Database, table, []byte(data))
 	if err != nil {
 		return err
 	}
@@ -205,7 +216,7 @@ func emitUpdatedEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Update) (err err
 		return
 	}
 	table := sqlparser.String(stmt.TableExprs)
-	beforModels, err := byte2SQLModels(table, []byte(sqlRawEvent.BeforeData))
+	beforModels, err := byte2SQLModels(sqlRawEvent.Database, table, []byte(sqlRawEvent.BeforeData))
 	if err != nil {
 		return err
 	}
@@ -218,7 +229,7 @@ func emitUpdatedEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Update) (err err
 	if err != nil {
 		return err
 	}
-	afterModels, err := byte2SQLModels(table, []byte(data))
+	afterModels, err := byte2SQLModels(sqlRawEvent.Database, table, []byte(data))
 	if err != nil {
 		return err
 	}
@@ -231,7 +242,7 @@ func emitUpdatedEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Update) (err err
 
 func emitDeleteEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Delete) (err error) {
 	table := sqlparser.String(stmt.TableExprs[0])
-	primaryKey, err := GetPrimaryKey(table)
+	primaryKey, err := GetPrimaryKey(sqlRawEvent.Database, table)
 	if err != nil {
 		return err
 	}
@@ -247,7 +258,7 @@ func emitDeleteEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Delete) (err erro
 	if err != nil {
 		return err
 	}
-	afterModels, err := byte2SQLModels(table, []byte(data))
+	afterModels, err := byte2SQLModels(sqlRawEvent.Database, table, []byte(data))
 	if err != nil {
 		return err
 	}
@@ -260,7 +271,7 @@ func emitDeleteEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Delete) (err erro
 
 func emitSoftDeleteEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Update) (err error) {
 	table := sqlparser.String(stmt.TableExprs[0])
-	beforModels, err := byte2SQLModels(table, []byte(sqlRawEvent.BeforeData))
+	beforModels, err := byte2SQLModels(sqlRawEvent.Database, table, []byte(sqlRawEvent.BeforeData))
 	if err != nil {
 		return err
 	}
@@ -271,8 +282,8 @@ func emitSoftDeleteEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Update) (err 
 	return nil
 }
 
-func byte2SQLModels(table string, b []byte) (sqlModels SQLModels, err error) {
-	primaryKey, err := GetPrimaryKey(table)
+func byte2SQLModels(database string, table string, b []byte) (sqlModels SQLModels, err error) {
+	primaryKey, err := GetPrimaryKey(database, table)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +345,7 @@ func RegisterTablePrimaryKeyByDB(db *sql.DB, dbName string) (err error) {
 		return err
 	}
 	for _, primaryKey := range primaryKeys {
-		RegisterTablePrimaryKey(primaryKey.Table, primaryKey)
+		RegisterTablePrimaryKey(dbName, primaryKey.Table, primaryKey)
 	}
 	return nil
 }
