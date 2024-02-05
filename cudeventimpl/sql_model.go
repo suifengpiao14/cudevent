@@ -6,44 +6,34 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 
 	"github.com/blastrain/vitess-sqlparser/sqlparser"
 	"github.com/suifengpiao14/cudevent"
 	"github.com/suifengpiao14/sqlexec"
+	"github.com/suifengpiao14/sqlexec/sqlexecparser"
 	"github.com/tidwall/gjson"
 )
 
 var SoftDeleteColumn = "deleted_at" // 当update语句出现该列时，当成删除操作
 
-var tablePrimaryKeyMap sync.Map
-
-func getTablePrimaryKeyMapKey(database string, table string) (key string) {
-	return fmt.Sprintf("%s_%s", database, table)
-}
-func RegisterTablePrimaryKey(database string, table string, primaryKey BaseField) {
-	key := getTablePrimaryKeyMapKey(database, table)
-	tablePrimaryKeyMap.Store(key, &primaryKey)
-}
-
-var (
-	ERROR_NOT_FOUND_PRIMARY_KEY_BY_TABLE_NAME = errors.New("not found primary key by table name")
-	ERROR_INVALID_TYPE                        = errors.New("invalid type")
-)
-
-func GetPrimaryKey(database string, table string) (primaryKey *BaseField, err error) {
-	key := getTablePrimaryKeyMapKey(database, table)
-	v, ok := tablePrimaryKeyMap.Load(key)
-	if !ok {
-		err = errors.WithMessagef(ERROR_NOT_FOUND_PRIMARY_KEY_BY_TABLE_NAME, "%s", key)
+func GetPrimaryKey(database string, tableName string) (primaryKey *BaseField, err error) {
+	table, err := sqlexecparser.GetTable(database, tableName)
+	if err != nil {
 		return nil, err
 	}
-	primaryKey, ok = v.(*BaseField)
+	column, ok := table.Columns.GetPrimary().GetFirst()
 	if !ok {
-		return nil, ERROR_INVALID_TYPE
+		err = errors.Errorf("not found primary key ")
+		return nil, err
+	}
+	primaryKey = &BaseField{
+		Database:   database,
+		Table:      tableName,
+		Column:     column.ColumnName,
+		Type:       column.Type,
+		PrimaryKey: column.PrimaryKey,
 	}
 	return primaryKey, nil
 }
@@ -319,22 +309,4 @@ func getByIDsSQL(table string, primaryKey BaseField, ids []string) (sql string) 
 		sql = fmt.Sprintf("select * from `%s` where `%s`=%s;", table, primaryKey.Column, idstr)
 	}
 	return sql
-}
-
-func RegisterTablePrimaryKeyByDB(db *sql.DB, dbName string) (err error) {
-	sql := fmt.Sprintf("SELECT  table_name `table`,column_name `column`,data_type `type` FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '%s' AND COLUMN_KEY = 'PRI'", dbName)
-	primaryKeys := make([]BaseField, 0)
-	rows, err := db.QueryContext(context.Background(), sql)
-	if err != nil {
-		return err
-	}
-	err = sqlx.StructScan(rows, &primaryKeys)
-	if err != nil {
-		return err
-	}
-	for _, primaryKey := range primaryKeys {
-		primaryKey.PrimaryKey = true
-		RegisterTablePrimaryKey(dbName, primaryKey.Table, primaryKey)
-	}
-	return nil
 }

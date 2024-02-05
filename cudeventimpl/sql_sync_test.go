@@ -3,15 +3,26 @@ package cudeventimpl_test
 import (
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/suifengpiao14/cudevent/cudeventimpl"
+	"github.com/suifengpiao14/sqlexec"
+	"github.com/suifengpiao14/sqlexecparser"
 )
 
-func Init() {
-	database := "test"
+func Init() (err error) {
+	database := "export"
+	sqlddlFile := "./test/exportservice.sql"
+	ddlByte, err := os.ReadFile(sqlddlFile)
+	if err != nil {
+		return err
+	}
+	sqlexecparser.RegisterTablePrimaryKeyByDB()
+	sqlexec.RegisterDB()
+
 	cudeventimpl.RegisterTablePrimaryKey(database, "user", cudeventimpl.BaseField{
 		Database:   database,
 		Table:      "user",
