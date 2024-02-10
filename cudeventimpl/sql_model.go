@@ -18,24 +18,37 @@ import (
 
 var SoftDeleteColumn = "deleted_at" // 当update语句出现该列时，当成删除操作
 
-func GetPrimaryKey(database string, tableName string) (primaryKey *BaseField, err error) {
+func GetPrimaryKey(database string, tableName string) (primaryKeys []BaseField, err error) {
 	table, err := sqlexecparser.GetTable(database, tableName)
 	if err != nil {
 		return nil, err
 	}
-	column, ok := table.Columns.GetPrimary().GetFirst()
+	constant, ok := table.Constraints.GetByType(sqlexecparser.Constraint_Type_Primary)
 	if !ok {
 		err = errors.Errorf("not found primary key ")
 		return nil, err
 	}
-	primaryKey = &BaseField{
-		Database:   database,
-		Table:      tableName,
-		Column:     column.ColumnName,
-		Type:       column.Type,
-		PrimaryKey: column.PrimaryKey,
+	primaryKeys = make([]BaseField, 0)
+	for _, name := range constant.ColumnNames {
+		column, ok := table.Columns.GetByName(name)
+		if !ok {
+			err = errors.Errorf("not found primary part key :%s in table column", name)
+			return nil, err
+		}
+		primaryKey := BaseField{
+			Database:   database,
+			Table:      tableName,
+			Column:     column.ColumnName,
+			Type:       column.Type,
+			PrimaryKey: true,
+		}
+		primaryKeys = append(primaryKeys, primaryKey)
 	}
-	return primaryKey, nil
+	if len(primaryKeys) == 0 {
+		err = errors.Errorf("primary keys len zero ")
+		return nil, err
+	}
+	return primaryKeys, nil
 }
 
 type SQLModel struct {
@@ -168,7 +181,7 @@ func getIdentityFromWhere(whereExpr sqlparser.Expr, identityKey string) (expr sq
 
 func emitInsertEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Insert) (err error) {
 	table := sqlparser.String(stmt.Table)
-	primaryKey, err := GetPrimaryKey(sqlRawEvent.Database, table)
+	primaryKeys, err := GetPrimaryKey(sqlRawEvent.Database, table)
 	if err != nil {
 		return err
 	}
@@ -177,7 +190,7 @@ func emitInsertEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Insert) (err erro
 	if err != nil {
 		return err
 	}
-	selectSQL := getByIDsSQL(table, *primaryKey, ids)
+	selectSQL := getByIDsSQL(table, primaryKeys[0], ids)
 	ctx := context.Background()
 	data, err := sqlexec.QueryContext(ctx, sqlRawEvent.DB, selectSQL)
 	if err != nil {
@@ -226,17 +239,17 @@ func emitUpdatedEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Update) (err err
 
 func emitDeleteEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Delete) (err error) {
 	table := sqlparser.String(stmt.TableExprs[0])
-	primaryKey, err := GetPrimaryKey(sqlRawEvent.Database, table)
+	primaryKeys, err := GetPrimaryKey(sqlRawEvent.Database, table)
 	if err != nil {
 		return err
 	}
 
-	exp := getIdentityFromWhere(stmt.Where.Expr, primaryKey.Column)
+	exp := getIdentityFromWhere(stmt.Where.Expr, primaryKeys[0].Column)
 
 	ids := []string{
 		sqlparser.String(exp), // 此处需要再处理，delete 目前使用不到，暂时不写，仅提供思路
 	}
-	selectSQL := getByIDsSQL(table, *primaryKey, ids)
+	selectSQL := getByIDsSQL(table, primaryKeys[0], ids)
 	ctx := context.Background()
 	data, err := sqlexec.QueryContext(ctx, sqlRawEvent.DB, selectSQL)
 	if err != nil {
@@ -267,7 +280,7 @@ func emitSoftDeleteEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Update) (err 
 }
 
 func byte2SQLModels(database string, table string, b []byte) (sqlModels SQLModels, err error) {
-	primaryKey, err := GetPrimaryKey(database, table)
+	primaryKeys, err := GetPrimaryKey(database, table)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +294,7 @@ func byte2SQLModels(database string, table string, b []byte) (sqlModels SQLModel
 	sqlModels = make(SQLModels, 0)
 	for _, oneResult := range result.Array() {
 		sqlModel := SQLModel{
-			PrimaryKey: *primaryKey,
+			PrimaryKey: primaryKeys[0],
 			Table:      table,
 			data:       []byte(oneResult.String()),
 		}

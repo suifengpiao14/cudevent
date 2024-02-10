@@ -9,8 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/suifengpiao14/cudevent/cudeventimpl"
-	"github.com/suifengpiao14/sqlexec"
-	"github.com/suifengpiao14/sqlexecparser"
+	"github.com/suifengpiao14/sqlexec/sqlexecparser"
 )
 
 func Init() (err error) {
@@ -20,55 +19,28 @@ func Init() (err error) {
 	if err != nil {
 		return err
 	}
-	sqlexecparser.RegisterTablePrimaryKeyByDB()
-	sqlexec.RegisterDB()
-
-	cudeventimpl.RegisterTablePrimaryKey(database, "user", cudeventimpl.BaseField{
-		Database:   database,
-		Table:      "user",
-		Column:     "id",
-		Type:       "int",
-		PrimaryKey: true,
-	})
-	cudeventimpl.RegisterTablePrimaryKey(database, "department", cudeventimpl.BaseField{
-		Database:   database,
-		Table:      "department",
-		Column:     "id",
-		Type:       "int",
-		PrimaryKey: true,
-	})
-	cudeventimpl.RegisterTablePrimaryKey(database, "export_task", cudeventimpl.BaseField{
-		Database:   database,
-		Table:      "export_task",
-		Column:     "id",
-		Type:       "int",
-		PrimaryKey: true,
-	})
-	cudeventimpl.RegisterTablePrimaryKey(database, "export_template", cudeventimpl.BaseField{
-		Database:   database,
-		Table:      "export_template",
-		Column:     "id",
-		Type:       "int",
-		PrimaryKey: true,
-	})
+	err = sqlexecparser.RegisterTableByDDL(database, string(ddlByte))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-// todo 增加database维度后未通过测试,临时提交
 func TestSyncUpdateNamedSQL(t *testing.T) {
 	Init()
 	t.Run("normal", func(t *testing.T) {
-		relation := "department.user_name=user.name,department.user_nickname=user.nick_name"
-		relation2 := "department.user_id=user.id"
+		relation := "export.export_task.template_name=export.export_template.template_name,export.export_task.title=export.export_task.title"
+		relation2 := "export.export_task.template_id=export.export_template.id"
 		fieldRelations, err := cudeventimpl.ParseFieldRelation(relation, relation2)
 		require.NoError(t, err)
 		syncUpdateNamedSql, err := fieldRelations.SyncRedundantFieldByDstPrimaryKey()
 		require.NoError(t, err)
-		expected := "update user,department set `department`.`user_name`=`user`.`name`,`department`.`user_nickname`=`user`.`nick_name` where  1=1 and `department`.`user_id`=`user`.`id` and `department`.`id`=:ID limit 1"
+		expected := "update export_task,export_template set `export_task`.`template_name`=`export_template`.`template_name`,`export_task`.`title`=`export_template`.`title` where  1=1 and `export_task`.`template_id`=`export_template`.`id` and `export_task`.`id`=:ID limit 1"
 		assert.Equal(t, syncUpdateNamedSql, expected)
 	})
 	t.Run("no update field ", func(t *testing.T) {
 		relation := ""
-		relation2 := "department.user_id=user.id"
+		relation2 := "export.export_task.template_id=export.export_template.id"
 		fieldRelations, err := cudeventimpl.ParseFieldRelation(relation, relation2)
 		require.NoError(t, err)
 		_, err = fieldRelations.SyncRedundantFieldByDstPrimaryKey()
@@ -76,7 +48,7 @@ func TestSyncUpdateNamedSQL(t *testing.T) {
 	})
 
 	t.Run("no primary relation field", func(t *testing.T) {
-		relation := "department.user_name=user.name,department.user_nickname=user.nick_name"
+		relation := "export.export_task.template_name=export.export_template.template_name,export.export_task.title=export.export_task.title"
 		relation2 := ""
 		fieldRelations, err := cudeventimpl.ParseFieldRelation(relation, relation2)
 		require.NoError(t, err)

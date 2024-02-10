@@ -32,11 +32,11 @@ func (bf BaseField) TableFullname() (tableFullname string) {
 }
 
 func (bf BaseField) isPrimary() (yes bool, err error) {
-	primaryKey, err := GetPrimaryKey(bf.Database, bf.Table)
+	primaryKeys, err := GetPrimaryKey(bf.Database, bf.Table)
 	if err != nil {
 		return false, err
 	}
-	yes = bf.Column == primaryKey.Column
+	yes = bf.Column == primaryKeys[0].Column
 	return yes, nil
 }
 
@@ -198,7 +198,7 @@ func (frs FieldRelations) SyncRedundantFieldByDstPrimaryKey() (syncUpdateNamedSq
 		err = errors.WithMessagef(ERROR_NO_UPDATE_FIELD, ",got:%s", filedRelations.SQL(","))
 		return "", err
 	}
-	if len(primaryFieldRealtions) < len(srcTables) {
+	if len(primaryFieldRealtions) < len(srcTables)-1 {
 		err = errors.WithMessagef(ERROR_PRIMARY_RELATION_FIELD_LESS_THEN_SRC_TABLE_COUNT, ",got:%s", filedRelations.SQL(","))
 		return "", err
 	}
@@ -207,7 +207,7 @@ func (frs FieldRelations) SyncRedundantFieldByDstPrimaryKey() (syncUpdateNamedSq
 	if err != nil {
 		return "", err
 	}
-	where := fmt.Sprintf("%s and %s=:ID", primaryFieldRealtions.SQL(" and "), dstPrimaryField.FieldFullname())
+	where := fmt.Sprintf("%s and %s=:ID", primaryFieldRealtions.SQL(" and "), dstPrimaryField[0].FieldFullname())
 	syncUpdateNamedSql = fmt.Sprintf("update %s,%s set %s where 1=1 and %s;", dstTable, strings.Join(srcTables, ","), updateSegment, where)
 	return syncUpdateNamedSql, nil
 }
@@ -244,7 +244,7 @@ func (frs FieldRelations) SyncRedundantFieldBySrcPrimaryKey() (syncUpdateNamedSq
 		if err != nil {
 			return nil, err
 		}
-		where := fmt.Sprintf("%s and %s=:ID", primaryFieldRealtions.SQL(" and "), srcPrimaryField.FieldFullname())
+		where := fmt.Sprintf("%s and %s=:ID", primaryFieldRealtions.SQL(" and "), srcPrimaryField[0].FieldFullname())
 		syncUpdateNamedSql := fmt.Sprintf("update %s,%s set %s where 1=1 and %s;", dstTable, srcTable, updateSegment, where)
 		syncUpdateNamedSqls = append(syncUpdateNamedSqls, syncUpdateNamedSql)
 	}
@@ -305,12 +305,13 @@ func ParseField(dbTableField string) (baseField *BaseField, err error) {
 	dbTableField = strings.ReplaceAll(dbTableField, "`", "")
 	arr := strings.Split(dbTableField, ".")
 	l := len(arr)
-	if l != 2 && l != 3 {
-		err = errors.Errorf("dbTableFiled want [db.]table.filed struct ,got:%s", dbTableField)
+	if l != 3 {
+		err = errors.Errorf("dbTableFiled want db.table.filed struct ,got:%s", dbTableField)
 		return nil, err
 	}
-	baseField.Table = arr[0]
-	baseField.Column = arr[1]
+	baseField.Database = arr[0]
+	baseField.Table = arr[1]
+	baseField.Column = arr[2]
 	yes, err := baseField.isPrimary()
 	if err != nil {
 		return nil, err
