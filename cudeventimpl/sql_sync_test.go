@@ -3,61 +3,48 @@ package cudeventimpl_test
 import (
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/suifengpiao14/cudevent/cudeventimpl"
+	"github.com/suifengpiao14/sqlexec/sqlexecparser"
 )
 
-func Init() {
-	database := "test"
-	cudeventimpl.RegisterTablePrimaryKey(database, "user", cudeventimpl.BaseField{
-		Database:   database,
-		Table:      "user",
-		Column:     "id",
-		Type:       "int",
-		PrimaryKey: true,
-	})
-	cudeventimpl.RegisterTablePrimaryKey(database, "department", cudeventimpl.BaseField{
-		Database:   database,
-		Table:      "department",
-		Column:     "id",
-		Type:       "int",
-		PrimaryKey: true,
-	})
-	cudeventimpl.RegisterTablePrimaryKey(database, "export_task", cudeventimpl.BaseField{
-		Database:   database,
-		Table:      "export_task",
-		Column:     "id",
-		Type:       "int",
-		PrimaryKey: true,
-	})
-	cudeventimpl.RegisterTablePrimaryKey(database, "export_template", cudeventimpl.BaseField{
-		Database:   database,
-		Table:      "export_template",
-		Column:     "id",
-		Type:       "int",
-		PrimaryKey: true,
-	})
+func Init() (err error) {
+	ddl := "./ddl.sql"
+	b, err := os.ReadFile(ddl)
+	if err != nil {
+		return err
+	}
+	err = sqlexecparser.RegisterTableByDDL(string(b))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // todo 增加database维度后未通过测试,临时提交
 func TestSyncUpdateNamedSQL(t *testing.T) {
-	Init()
+
 	t.Run("normal", func(t *testing.T) {
-		relation := "department.user_name=user.name,department.user_nickname=user.nick_name"
-		relation2 := "department.user_id=user.id"
+		err := Init()
+		require.NoError(t, err)
+		relation := "oa.department.user_name=oa.user.name,oa.department.user_nickname=oa.user.nickname"
+		relation2 := "oa.department.user_id=oa.user.id"
 		fieldRelations, err := cudeventimpl.ParseFieldRelation(relation, relation2)
 		require.NoError(t, err)
 		syncUpdateNamedSql, err := fieldRelations.SyncRedundantFieldByDstPrimaryKey()
 		require.NoError(t, err)
-		expected := "update user,department set `department`.`user_name`=`user`.`name`,`department`.`user_nickname`=`user`.`nick_name` where  1=1 and `department`.`user_id`=`user`.`id` and `department`.`id`=:ID limit 1"
-		assert.Equal(t, syncUpdateNamedSql, expected)
+		expected := "update oa.department,oa.user set oa.department.user_name=oa.user.name,oa.department.user_nickname=oa.user.nickname where 1=1 and oa.department.user_id=oa.user.id and oa.department.id = :id;"
+		assert.Equal(t, expected, syncUpdateNamedSql)
 	})
 	t.Run("no update field ", func(t *testing.T) {
+		err := Init()
+		require.NoError(t, err)
 		relation := ""
-		relation2 := "department.user_id=user.id"
+		relation2 := "oa.department.user_id=oa.user.id"
 		fieldRelations, err := cudeventimpl.ParseFieldRelation(relation, relation2)
 		require.NoError(t, err)
 		_, err = fieldRelations.SyncRedundantFieldByDstPrimaryKey()
@@ -65,7 +52,9 @@ func TestSyncUpdateNamedSQL(t *testing.T) {
 	})
 
 	t.Run("no primary relation field", func(t *testing.T) {
-		relation := "department.user_name=user.name,department.user_nickname=user.nick_name"
+		err := Init()
+		require.NoError(t, err)
+		relation := "oa.department.user_name=oa.user.name,oa.department.user_nickname=oa.user.nickname"
 		relation2 := ""
 		fieldRelations, err := cudeventimpl.ParseFieldRelation(relation, relation2)
 		require.NoError(t, err)
@@ -78,9 +67,9 @@ func TestSyncUpdateNamedSQL(t *testing.T) {
 func TestParseRelation(t *testing.T) {
 	Init()
 	relationStr := `
-	export_task.title=export_template.title,
-	export_task.timeout=export_template.max_exec_time,
-	export_task.template_id=export_template.id,
+	export.export_task.title=export.export_template.title,
+	export.export_task.timeout=export.export_template.max_exec_time,
+	export.export_task.template_id=export.export_template.id,
 	`
 	relation, err := cudeventimpl.ParseFieldRelation(relationStr)
 	require.NoError(t, err)
@@ -90,8 +79,8 @@ func TestParseRelation(t *testing.T) {
 func TestSyncRedundantFieldBySrcPrimaryKey(t *testing.T) {
 	Init()
 	relationStr := `
-	export_task.timeout=export_template.max_exec_time,
-	export_task.template_id=export_template.id,
+	export.export_task.timeout=export.export_template.max_exec_time,
+	export.export_task.template_id=export.export_template.id,
 	`
 	relation, err := cudeventimpl.ParseFieldRelation(relationStr)
 	require.NoError(t, err)

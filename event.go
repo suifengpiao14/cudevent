@@ -51,7 +51,7 @@ func newChangedPayload(beforeEmiters CUDEmiter, afterEmiters CUDEmiter) (payload
 			if err != nil {
 				return nil, err
 			}
-			payload := diffEmiter2Payload(after.GetIdentity(), nil, data)
+			payload := diffEmiter2Payload(after.GetIdentity().String(), nil, data)
 			payloads = append(payloads, payload)
 		}
 		return
@@ -62,13 +62,13 @@ func newChangedPayload(beforeEmiters CUDEmiter, afterEmiters CUDEmiter) (payload
 			if err != nil {
 				return nil, err
 			}
-			payload := diffEmiter2Payload(before.GetIdentity(), nil, data)
+			payload := diffEmiter2Payload(before.GetIdentity().String(), nil, data)
 			payloads = append(payloads, payload)
 		}
 		return
 	}
 	for _, befor := range beforeEmiters {
-		after, _ := afterEmiters.GetByIdentity(befor.GetIdentity())
+		after, _ := afterEmiters.GetByIdentity(befor.GetIdentity().String())
 		var oldPatch, newPatch []byte
 		if befor != nil && after != nil { // 变化前后都有值时，对比保留发生变化的属性
 			oldPatch, newPatch, err = diff(befor, after)
@@ -76,7 +76,7 @@ func newChangedPayload(beforeEmiters CUDEmiter, afterEmiters CUDEmiter) (payload
 				return nil, err
 			}
 		}
-		payload := diffEmiter2Payload(befor.GetIdentity(), oldPatch, newPatch)
+		payload := diffEmiter2Payload(befor.GetIdentity().String(), oldPatch, newPatch)
 		payloads = append(payloads, payload)
 	}
 	return payloads, nil

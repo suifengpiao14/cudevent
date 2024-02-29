@@ -5,45 +5,18 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/blastrain/vitess-sqlparser/sqlparser"
 	"github.com/pkg/errors"
+	"github.com/suifengpiao14/cudevent"
 	"github.com/suifengpiao14/funcs"
 	"github.com/suifengpiao14/sqlexec"
+	"github.com/suifengpiao14/sqlexec/sqlexecparser"
 )
-
-// BaseField 平铺的数据库字段结构
-type BaseField struct {
-	Database   string `json:"database" db:"database"`
-	Table      string `json:"table" db:"table"`
-	Column     string `json:"column" db:"column"`
-	Type       string `json:"type" db:"type"`
-	PrimaryKey bool   `json:"primaryKey" db:"primaryKey"`
-}
-
-const BaseField_Type_string = "string"
-
-func (bf BaseField) FieldFullname() (fieldFullname string) {
-	fieldFullname = fmt.Sprintf("`%s`.`%s`.`%s`", bf.Database, bf.Table, bf.Column)
-	return fieldFullname
-}
-
-func (bf BaseField) TableFullname() (tableFullname string) {
-	tableFullname = fmt.Sprintf("%s.%s", bf.Database, bf.Table)
-	return tableFullname
-}
-
-func (bf BaseField) isPrimary() (yes bool, err error) {
-	primaryKey, err := GetPrimaryKey(bf.Database, bf.Table)
-	if err != nil {
-		return false, err
-	}
-	yes = bf.Column == primaryKey.Column
-	return yes, nil
-}
 
 type FieldRelation struct {
 	Scene string `json:"scene"`
-	Dst   BaseField
-	Src   BaseField
+	Dst   sqlexecparser.Column
+	Src   sqlexecparser.Column
 }
 
 const (
@@ -52,7 +25,7 @@ const (
 )
 
 func (fr FieldRelation) SQL() (sqlSegment string) {
-	sqlSegment = fmt.Sprintf("%s=%s", fr.Dst.FieldFullname(), fr.Src.FieldFullname())
+	sqlSegment = fmt.Sprintf("%s=%s", fr.Dst.ColumnFullname(), fr.Src.ColumnFullname())
 	return sqlSegment
 }
 
@@ -89,7 +62,7 @@ func (frs FieldRelations) Uniqueue() (uniqueued FieldRelations) {
 func (frs FieldRelations) GetBySrcTable(srcTable string) (sameSrcTableFieldRelations FieldRelations) {
 	sameSrcTableFieldRelations = make(FieldRelations, 0)
 	for _, fr := range frs {
-		if strings.EqualFold(fr.Src.Table, srcTable) {
+		if strings.EqualFold(fr.Src.TableFullname(), srcTable) {
 			sameSrcTableFieldRelations = append(sameSrcTableFieldRelations, fr)
 		}
 	}
@@ -107,7 +80,7 @@ func (frs *FieldRelations) SetScene(scene string) (withSceneTableFieldRelations 
 func (frs FieldRelations) GetByDstTable(dstTable string) (sameDstTableFieldRelations FieldRelations) {
 	sameDstTableFieldRelations = make(FieldRelations, 0)
 	for _, fr := range frs {
-		if strings.EqualFold(fr.Dst.Table, dstTable) {
+		if strings.EqualFold(fr.Dst.TableFullname(), dstTable) {
 			sameDstTableFieldRelations = append(sameDstTableFieldRelations, fr)
 		}
 	}
@@ -128,8 +101,8 @@ func (frs FieldRelations) Tables() (dstTables []string, srcTables []string) {
 	srcMap := map[string]struct{}{}
 	dstMap := map[string]struct{}{}
 	for _, fr := range frs {
-		dstMap[fr.Dst.Table] = struct{}{}
-		srcMap[fr.Src.Table] = struct{}{}
+		dstMap[fr.Dst.TableFullname()] = struct{}{}
+		srcMap[fr.Src.TableFullname()] = struct{}{}
 	}
 	// 目标表
 	dstTables = make([]string, 0)
@@ -166,7 +139,7 @@ func (frs FieldRelations) SplitPrimaryFieldRelation() (ordinaryFieldRelations Fi
 // GetPrimayRelationBySrcTable 获取主键关联关系
 func (frs FieldRelations) GetPrimayRelationBySrcTable(srcTable string) (baseField *FieldRelation, err error) {
 	for _, fr := range frs {
-		if fr.Src.Table == srcTable && fr.Src.PrimaryKey {
+		if fr.Src.TableName.EqualFold(sqlexecparser.TableName(srcTable)) && fr.Src.PrimaryKey {
 			return
 		}
 	}
@@ -186,7 +159,7 @@ func (frs FieldRelations) SyncRedundantFieldByDstPrimaryKey() (syncUpdateNamedSq
 		err = errors.Errorf("SyncRedundantFieldByDstPrimaryKey filedRelations required, got empty")
 		return "", err
 	}
-	database := frs[0].Dst.Database
+	database := string(frs[0].Dst.DBName)
 	dstTables, srcTables := frs.Tables()
 	if len(dstTables) != 1 {
 		err = errors.Errorf("SyncRedundantFieldBySrcPrimaryKey dst table need only one get more than one :%s", strings.Join(dstTables, ","))
@@ -207,7 +180,17 @@ func (frs FieldRelations) SyncRedundantFieldByDstPrimaryKey() (syncUpdateNamedSq
 	if err != nil {
 		return "", err
 	}
-	where := fmt.Sprintf("%s and %s=:ID", primaryFieldRealtions.SQL(" and "), dstPrimaryField.FieldFullname())
+	columnValues := make(sqlexecparser.ColumnValues, 0)
+	for _, c := range dstPrimaryField {
+		arg := fmt.Sprintf(":%s", funcs.ToLowerCamel(string(c.ColumnName)))
+		columnValues.AddIgnore(sqlexecparser.ColumnValue{
+			Column:   sqlexecparser.ColumnName(c.ColumnFullname()),
+			Operator: sqlparser.EqualStr,
+			Value:    sqlparser.NewValArg([]byte(arg)),
+		})
+	}
+	primaryKeyWhere := columnValues.WhereAndExpr()
+	where := fmt.Sprintf("%s and %s", primaryFieldRealtions.SQL(" and "), sqlparser.String(primaryKeyWhere.Expr))
 	syncUpdateNamedSql = fmt.Sprintf("update %s,%s set %s where 1=1 and %s;", dstTable, strings.Join(srcTables, ","), updateSegment, where)
 	return syncUpdateNamedSql, nil
 }
@@ -225,7 +208,7 @@ func (frs FieldRelations) SyncRedundantFieldBySrcPrimaryKey() (syncUpdateNamedSq
 		err = errors.Errorf("SyncRedundantFieldBySrcPrimaryKey src table need only one get more than one :%s", strings.Join(srcTables, ","))
 		return nil, err
 	}
-	database := frs[0].Src.Database
+	database := string(frs[0].Src.DBName)
 	srcTable := srcTables[0]
 	for _, dstTable := range dstTables {
 		subFieldRelations := frs.GetByDstTable(dstTable)
@@ -244,7 +227,18 @@ func (frs FieldRelations) SyncRedundantFieldBySrcPrimaryKey() (syncUpdateNamedSq
 		if err != nil {
 			return nil, err
 		}
-		where := fmt.Sprintf("%s and %s=:ID", primaryFieldRealtions.SQL(" and "), srcPrimaryField.FieldFullname())
+
+		columnValues := make(sqlexecparser.ColumnValues, 0)
+		for _, c := range srcPrimaryField {
+			columnValues.AddIgnore(sqlexecparser.ColumnValue{
+				Column:   c.ColumnName,
+				Operator: sqlparser.EqualStr,
+				Value:    funcs.ToLowerCamel(string(c.ColumnName)),
+			})
+		}
+		primaryKeyWhere := columnValues.WhereAndExpr()
+
+		where := fmt.Sprintf("%s and %s=:ID", primaryFieldRealtions.SQL(" and "), sqlparser.String(primaryKeyWhere))
 		syncUpdateNamedSql := fmt.Sprintf("update %s,%s set %s where 1=1 and %s;", dstTable, srcTable, updateSegment, where)
 		syncUpdateNamedSqls = append(syncUpdateNamedSqls, syncUpdateNamedSql)
 	}
@@ -253,7 +247,7 @@ func (frs FieldRelations) SyncRedundantFieldBySrcPrimaryKey() (syncUpdateNamedSq
 
 // ExplainSQLWithID 将只有Id参数的named sql 转为sql
 func ExplainSQLWithID(namedSql string, id any) (sql string, err error) {
-	namedData := map[string]any{
+	namedData := cudevent.IdentifyKv{
 		"ID": id,
 		"Id": id,
 		"id": id,
@@ -284,12 +278,12 @@ func ParseFieldRelation(relationStrs ...string) (filedRelations FieldRelations, 
 			return nil, err
 		}
 		relation := FieldRelation{}
-		dstFieldPath, err := ParseField(pair[0])
+		dstFieldPath, err := GetColumnByFullname(pair[0])
 		if err != nil {
 			return nil, err
 		}
 		relation.Dst = *dstFieldPath
-		srcFieldPath, err := ParseField(pair[1])
+		srcFieldPath, err := GetColumnByFullname(pair[1])
 		if err != nil {
 			return nil, err
 		}
@@ -299,22 +293,25 @@ func ParseFieldRelation(relationStrs ...string) (filedRelations FieldRelations, 
 	return filedRelations, nil
 }
 
-// ParseField 字符串转BaseField类型
-func ParseField(dbTableField string) (baseField *BaseField, err error) {
-	baseField = &BaseField{}
-	dbTableField = strings.ReplaceAll(dbTableField, "`", "")
-	arr := strings.Split(dbTableField, ".")
+// GetColumnByFullname 字符串转BaseField类型
+func GetColumnByFullname(dbTableColumnName string) (column *sqlexecparser.Column, err error) {
+	column = &sqlexecparser.Column{}
+	dbTableColumnName = strings.ReplaceAll(dbTableColumnName, "`", "")
+	arr := strings.Split(dbTableColumnName, ".")
 	l := len(arr)
-	if l != 2 && l != 3 {
-		err = errors.Errorf("dbTableFiled want [db.]table.filed struct ,got:%s", dbTableField)
+	if l != 3 {
+		err = errors.Errorf("dbTableFiled want db.table.filed struct ,got:%s", dbTableColumnName)
 		return nil, err
 	}
-	baseField.Table = arr[0]
-	baseField.Column = arr[1]
-	yes, err := baseField.isPrimary()
+	dbName, tableName, columnName := sqlexecparser.DBName(arr[0]), sqlexecparser.TableName(arr[1]), sqlexecparser.ColumnName(arr[2])
+	table, err := sqlexecparser.GetTable(dbName, tableName)
 	if err != nil {
 		return nil, err
 	}
-	baseField.PrimaryKey = yes
-	return baseField, nil
+	column, ok := table.Columns.GetByName(columnName)
+	if !ok {
+		err = errors.Errorf("not found colum %s.%s.%s", dbName, tableName, columnName)
+		return nil, err
+	}
+	return column, nil
 }

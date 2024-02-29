@@ -70,7 +70,7 @@ func (cudModel CUDModel) SetModel(ctx context.Context, addFn CUDAddHandleFn, upd
 	}
 	updateIds := make([]string, 0)
 	for _, model := range oldModels {
-		updateIds = append(updateIds, model.GetIdentity())
+		updateIds = append(updateIds, model.GetIdentity().String())
 	}
 	addIds := make([]string, 0)
 	for _, id := range ids {
@@ -108,7 +108,7 @@ func (cudModel CUDModel) SetModel(ctx context.Context, addFn CUDAddHandleFn, upd
 
 	for _, model := range newmodels {
 		isInsertModel := false
-		id := model.GetIdentity()
+		id := model.GetIdentity().GetFirstValue()
 		for _, insertId := range insertIds {
 			isInsertModel = insertId == id
 			if isInsertModel {

@@ -6,56 +6,69 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 
 	"github.com/blastrain/vitess-sqlparser/sqlparser"
 	"github.com/suifengpiao14/cudevent"
 	"github.com/suifengpiao14/sqlexec"
+	"github.com/suifengpiao14/sqlexec/sqlexecparser"
 	"github.com/tidwall/gjson"
 )
 
 var SoftDeleteColumn = "deleted_at" // 当update语句出现该列时，当成删除操作
 
-var tablePrimaryKeyMap sync.Map
+//var tablePrimaryKeyMap sync.Map
 
-func getTablePrimaryKeyMapKey(database string, table string) (key string) {
-	return fmt.Sprintf("%s_%s", database, table)
-}
-func RegisterTablePrimaryKey(database string, table string, primaryKey BaseField) {
-	key := getTablePrimaryKeyMapKey(database, table)
-	tablePrimaryKeyMap.Store(key, &primaryKey)
-}
+// func getTablePrimaryKeyMapKey(database string, table string) (key string) {
+// 	return fmt.Sprintf("%s_%s", database, table)
+// }
+
+// func RegisterTablePrimaryKey(database string, table string, primaryKey BaseField) {
+// 	key := getTablePrimaryKeyMapKey(database, table)
+// 	tablePrimaryKeyMap.Store(key, &primaryKey)
+// }
 
 var (
 	ERROR_NOT_FOUND_PRIMARY_KEY_BY_TABLE_NAME = errors.New("not found primary key by table name")
 	ERROR_INVALID_TYPE                        = errors.New("invalid type")
 )
 
-func GetPrimaryKey(database string, table string) (primaryKey *BaseField, err error) {
-	key := getTablePrimaryKeyMapKey(database, table)
-	v, ok := tablePrimaryKeyMap.Load(key)
-	if !ok {
-		err = errors.WithMessagef(ERROR_NOT_FOUND_PRIMARY_KEY_BY_TABLE_NAME, "%s", key)
+func GetPrimaryKey(database string, tableName string) (primaries sqlexecparser.Columns, err error) {
+	table, err := sqlexecparser.GetTable(sqlexecparser.DBName(database), sqlexecparser.TableName(tableName))
+	if err != nil {
 		return nil, err
 	}
-	primaryKey, ok = v.(*BaseField)
-	if !ok {
-		return nil, ERROR_INVALID_TYPE
+	primaries, err = table.GetPrimaryKey()
+	if err != nil {
+		err = errors.WithMessagef(err, "database:%s", database)
+		return nil, err
 	}
-	return primaryKey, nil
+	return primaries, nil
 }
 
 type SQLModel struct {
-	PrimaryKey BaseField
-	Table      string
-	data       []byte
+	PrimaryColumns sqlexecparser.Columns
+	Table          string
+	data           []byte
 }
 
-func (m SQLModel) GetIdentity() (id string) {
-	return gjson.GetBytes(m.data, m.PrimaryKey.Column).String()
+func (m SQLModel) GetIdentity() (identifyKv cudevent.IdentifyKv) {
+	arr := make([]string, 0)
+	for _, c := range m.PrimaryColumns {
+		arr = append(arr, fmt.Sprintf("%s=%s", c.ColumnName, c.ColumnName))
+	}
+	gpath := fmt.Sprintf(`{%s}`, strings.Join(arr, ","))
+	data := gjson.GetBytes(m.data, gpath).String()
+	if data == "" {
+		return identifyKv
+	}
+	identifyKv = make(cudevent.IdentifyKv)
+	err := json.Unmarshal([]byte(data), &identifyKv)
+	if err != nil {
+		panic(err)
+	}
+	return identifyKv
 }
 
 func (m SQLModel) GetDomain() (domain string) {
@@ -75,17 +88,17 @@ func (ms SQLModels) ToCUDEmiter() (cudEmiter cudevent.CUDEmiter) {
 	return cudEmiter
 }
 
-func (ms SQLModels) GetIdentities() (identities []string) {
-	identities = make([]string, 0)
+func (ms SQLModels) GetIdentities() (identities []cudevent.IdentifyKv) {
+	identities = make([]cudevent.IdentifyKv, 0)
 	for _, m := range ms {
 		identities = append(identities, m.GetIdentity())
 	}
 	return identities
 }
 
-func (ms SQLModels) GetPrimaryKey() (primaryKey *BaseField) {
+func (ms SQLModels) GetPrimaryKey() (primaryKey sqlexecparser.Columns) {
 	for _, m := range ms {
-		return &m.PrimaryKey
+		return m.PrimaryColumns
 	}
 	return nil
 }
@@ -159,26 +172,9 @@ func PublishSQLRawEventAsync(sqlRawEvent *SQLRawEvent) {
 
 }
 
-// getIdentityFromWhere 从where 条件中获取主键条件——需完善
-func getIdentityFromWhere(whereExpr sqlparser.Expr, identityKey string) (expr sqlparser.Expr) {
-	colIdent := sqlparser.NewColIdent(identityKey)
-	identityCol := &sqlparser.ColName{Name: colIdent}
-	switch expr := whereExpr.(type) {
-	case *sqlparser.ComparisonExpr:
-		if colExpr, ok := expr.Left.(*sqlparser.ColName); ok {
-			if colExpr.Equal(identityCol) {
-				return expr.Right
-			}
-		}
-		return getIdentityFromWhere(expr.Left, identityKey)
-
-	}
-	return
-}
-
 func emitInsertEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Insert) (err error) {
 	table := sqlparser.String(stmt.Table)
-	primaryKey, err := GetPrimaryKey(sqlRawEvent.Database, table)
+	primaryKeyColumns, err := GetPrimaryKey(sqlRawEvent.Database, table)
 	if err != nil {
 		return err
 	}
@@ -187,7 +183,16 @@ func emitInsertEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Insert) (err erro
 	if err != nil {
 		return err
 	}
-	selectSQL := getByIDsSQL(table, *primaryKey, ids)
+	colVals := make(sqlexecparser.ColumnValues, 0)
+	for _, col := range primaryKeyColumns {
+		cv := sqlexecparser.ColumnValue{
+			Column:   col.ColumnName,
+			Value:    ids,
+			Operator: sqlparser.InStr,
+		}
+		colVals.AddIgnore(cv)
+	}
+	selectSQL := getByIdentifySQL(table, colVals)
 	ctx := context.Background()
 	data, err := sqlexec.QueryContext(ctx, sqlRawEvent.DB, selectSQL)
 	if err != nil {
@@ -215,9 +220,14 @@ func emitUpdatedEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Update) (err err
 		return err
 	}
 
-	ids := beforModels.GetIdentities()
-	primaryKey := beforModels.GetPrimaryKey()
-	selectSQL := getByIDsSQL(table, *primaryKey, ids)
+	primaryColumns, err := GetPrimaryKey(sqlRawEvent.Database, table)
+	if err != nil {
+		return err
+	}
+	colNames := primaryColumns.GetNames()
+	columnvalues := sqlexecparser.ParseWhere(stmt.Where)
+	primaryColumnvalues := columnvalues.FilterByColName(colNames...)
+	selectSQL := getByIdentifySQL(table, primaryColumnvalues)
 	ctx := context.Background()
 	data, err := sqlexec.QueryContext(ctx, sqlRawEvent.DB, selectSQL)
 	if err != nil {
@@ -236,17 +246,15 @@ func emitUpdatedEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Update) (err err
 
 func emitDeleteEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Delete) (err error) {
 	table := sqlparser.String(stmt.TableExprs[0])
-	primaryKey, err := GetPrimaryKey(sqlRawEvent.Database, table)
+	primaryColumns, err := GetPrimaryKey(sqlRawEvent.Database, table)
 	if err != nil {
 		return err
 	}
 
-	exp := getIdentityFromWhere(stmt.Where.Expr, primaryKey.Column)
-
-	ids := []string{
-		sqlparser.String(exp), // 此处需要再处理，delete 目前使用不到，暂时不写，仅提供思路
-	}
-	selectSQL := getByIDsSQL(table, *primaryKey, ids)
+	colNames := primaryColumns.GetNames()
+	columnvalues := sqlexecparser.ParseWhere(stmt.Where)
+	primaryColumnvalues := columnvalues.FilterByColName(colNames...)
+	selectSQL := getByIdentifySQL(table, primaryColumnvalues)
 	ctx := context.Background()
 	data, err := sqlexec.QueryContext(ctx, sqlRawEvent.DB, selectSQL)
 	if err != nil {
@@ -277,7 +285,7 @@ func emitSoftDeleteEvent(sqlRawEvent *SQLRawEvent, stmt *sqlparser.Update) (err 
 }
 
 func byte2SQLModels(database string, table string, b []byte) (sqlModels SQLModels, err error) {
-	primaryKey, err := GetPrimaryKey(database, table)
+	primaryColumns, err := GetPrimaryKey(database, table)
 	if err != nil {
 		return nil, err
 	}
@@ -291,9 +299,9 @@ func byte2SQLModels(database string, table string, b []byte) (sqlModels SQLModel
 	sqlModels = make(SQLModels, 0)
 	for _, oneResult := range result.Array() {
 		sqlModel := SQLModel{
-			PrimaryKey: *primaryKey,
-			Table:      table,
-			data:       []byte(oneResult.String()),
+			PrimaryColumns: primaryColumns,
+			Table:          table,
+			data:           []byte(oneResult.String()),
 		}
 		sqlModels = append(sqlModels, sqlModel)
 	}
@@ -305,36 +313,8 @@ const (
 	PrimaryKey_Type_Int = "int"
 )
 
-func getByIDsSQL(table string, primaryKey BaseField, ids []string) (sql string) {
-	idstr := ""
-	switch strings.ToLower(primaryKey.Type) {
-	case PrimaryKey_Type_Int:
-		idstr = strings.Join(ids, `,`)
-	default:
-		idstr = fmt.Sprintf("'%s'", strings.Join(ids, `','`))
-	}
-	if strings.Contains(idstr, ",") {
-		sql = fmt.Sprintf("select * from `%s` where `%s` in (%s);", table, primaryKey.Column, idstr)
-	} else {
-		sql = fmt.Sprintf("select * from `%s` where `%s`=%s;", table, primaryKey.Column, idstr)
-	}
+//getByIdentifySQL 通过主键或者唯一索引键获取数据
+func getByIdentifySQL(table string, primaryColumnvalues sqlexecparser.ColumnValues) (sql string) {
+	sql = fmt.Sprintf("select * from %s %s;", table, sqlparser.String(primaryColumnvalues.WhereAndExpr()))
 	return sql
-}
-
-func RegisterTablePrimaryKeyByDB(db *sql.DB, dbName string) (err error) {
-	sql := fmt.Sprintf("SELECT  table_name `table`,column_name `column`,data_type `type` FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '%s' AND COLUMN_KEY = 'PRI'", dbName)
-	primaryKeys := make([]BaseField, 0)
-	rows, err := db.QueryContext(context.Background(), sql)
-	if err != nil {
-		return err
-	}
-	err = sqlx.StructScan(rows, &primaryKeys)
-	if err != nil {
-		return err
-	}
-	for _, primaryKey := range primaryKeys {
-		primaryKey.PrimaryKey = true
-		RegisterTablePrimaryKey(dbName, primaryKey.Table, primaryKey)
-	}
-	return nil
 }
