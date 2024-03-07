@@ -10,8 +10,8 @@ require (
 	github.com/spf13/cast v1.5.1
 	github.com/stretchr/testify v1.8.4
 	github.com/suifengpiao14/funcs v0.0.18
-	github.com/suifengpiao14/sqlexec v0.0.23
-	github.com/suifengpiao14/sshmysql v0.0.1
+	github.com/suifengpiao14/sqlexec v0.0.29
+	github.com/suifengpiao14/sshmysql v0.0.3
 	github.com/tidwall/gjson v1.17.0
 )
 
@@ -27,24 +27,23 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jfcote87/sshdb v0.5.3 // indirect
 	github.com/jmoiron/sqlx v1.3.5 // indirect
-	github.com/juju/errors v1.0.0 // indirect
+	github.com/juju/errors v0.0.0-20170703010042-c7d06af17c68 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
 	github.com/lithammer/shortuuid/v3 v3.0.7 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/opentracing/opentracing-go v1.0.2 // indirect
 	github.com/pingcap/errors v0.11.4 // indirect
 	github.com/pingcap/log v0.0.0-20190715063458-479153f07ebd // indirect
 	github.com/pingcap/parser v3.1.2+incompatible // indirect
-	github.com/pingcap/tidb v0.0.0-20190912055946-5c48d93368d4 // indirect
+	github.com/pingcap/tidb v0.0.0-20191023085059-c9000abdc216 // indirect
 	github.com/pingcap/tipb v0.0.0-20240227061755-3670eddec8d6 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/suifengpiao14/ddl-executor v0.0.2 // indirect
+	github.com/suifengpiao14/ddl-executor v0.0.4 // indirect
 	github.com/suifengpiao14/logchan/v2 v2.0.22 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
-	github.com/tidwall/pretty v1.2.1 // indirect
+	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.uber.org/atomic v1.3.2 // indirect
 	go.uber.org/multierr v1.1.0 // indirect
